@@ -1,0 +1,11 @@
+services:
+  redis:
+    image: redis:8.0.1
+    ports:
+      - 6379:6379
+    networks:
+      - test_net
+
+networks:
+  test_net:
+    driver: bridge
