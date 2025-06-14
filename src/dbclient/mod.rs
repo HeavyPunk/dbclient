@@ -1,7 +1,7 @@
 //#[cfg(feature = "redis")]
-mod redis;
+pub mod redis;
 
-mod query_builder;
+pub mod query_builder;
 
 pub(crate) mod fetcher {
     use super::query_builder::QueryElement;
