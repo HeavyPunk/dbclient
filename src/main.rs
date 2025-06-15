@@ -6,6 +6,7 @@ mod cli;
 mod config;
 mod dbclient;
 mod ui;
+mod ui2;
 
 fn main() {
     let args = Cli::parse();
@@ -16,6 +17,7 @@ fn main() {
     let config: Config = toml::from_str(&config_content)
         .expect("Failed to parse config file");
 
-    ui::draw(&config);
+    // ui::draw(&config);
+    ui2::draw(&config);
 }
 
