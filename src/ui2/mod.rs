@@ -1,5 +1,5 @@
 use crossterm::event::{self, KeyCode, KeyEvent};
-use pages::query::QueryPage;
+use pages::{main::MainPage, query::QueryPage};
 use ratatui::{layout::Rect, prelude::Backend, Frame, Terminal};
 
 use crate::config::{self, Config};
@@ -16,19 +16,28 @@ pub enum WidgetReaction {
     Nothing,
 }
 
-pub trait Widget {
+pub trait Widget<TerminalBackend>
+where
+    TerminalBackend: Backend,
+{
     fn render(&mut self, frame: &mut Frame, rect: &Rect, is_selected: bool);
-    fn react_on_event(&mut self, event: UiEvent) -> WidgetReaction;
+    fn react_on_event(&mut self, terminal: &mut Terminal<TerminalBackend>, event: UiEvent) -> WidgetReaction;
 }
 
-pub struct Renderer {
-    pub widgets: Vec<(Rect, Box<dyn Widget>, usize)>,
+pub struct Renderer<TerminalBackend>
+where
+    TerminalBackend: Backend,
+{
+    pub widgets: Vec<(Rect, Box<dyn Widget<TerminalBackend>>, usize)>,
     pub selected_widget_index: Option<usize>,
     pub select_widget_index: usize,
 }
 
-impl Renderer {
-    pub fn new(widgets: Vec<(Rect, Box<dyn Widget>, usize)>) -> Self {
+impl<TerminalBackend> Renderer<TerminalBackend>
+where
+    TerminalBackend: Backend,
+{
+    pub fn new(widgets: Vec<(Rect, Box<dyn Widget<TerminalBackend>>, usize)>) -> Self {
         Self {
             widgets,
             selected_widget_index: None,
@@ -37,24 +46,20 @@ impl Renderer {
     }
 
     pub fn rerender(&mut self, frame: &mut Frame) {
-        // if let Some(selected_widget_index) = self.selected_widget_index {
-        //     if let Some((rect, widget, _)) = self.widgets.get_mut(selected_widget_index) {
-        //         widget.render(frame, rect, true);
-        //     }
-        //     return;
-        // }
-
         for (rect, widget, index) in &mut self.widgets {
             widget.render(frame, rect, *index == self.select_widget_index);
         }
     }
 
-    pub fn run_event_loop(&mut self, terminal: &mut Terminal<impl Backend>) {
+    pub fn run_event_loop(&mut self, terminal: &mut Terminal<TerminalBackend>) {
+        if self.widgets.len() == 1 {
+            self.selected_widget_index = Some(0)
+        }
         loop {
             match event::read().expect("failed to read event") {
                 event::Event::Key(key_event) => {
                     if let Some(selected_widget_index) = self.selected_widget_index {
-                        match self.widgets[selected_widget_index].1.react_on_event(UiEvent::KeyboardEvent(key_event)) {
+                        match self.widgets[selected_widget_index].1.react_on_event(terminal, UiEvent::KeyboardEvent(key_event)) {
                             WidgetReaction::ExitFromWidget => self.selected_widget_index = None,
                             WidgetReaction::Nothing => (),
                         };
@@ -115,12 +120,15 @@ impl Renderer {
     }
 }
 
-pub fn draw(config: &Config) {
+pub fn draw(config: Config) {
     let mut terminal = ratatui::init();
     
-    let mut query_page = QueryPage::new(&mut terminal);
-    query_page.render(&mut terminal);
-    query_page.run_event_loop(&mut terminal);
+    let mut main_page = MainPage::new(&mut terminal, config);
+    main_page.render(&mut terminal);
+    main_page.run_event_loop(&mut terminal);
+    // let mut query_page = QueryPage::new(&mut terminal);
+    // query_page.render(&mut terminal);
+    // query_page.run_event_loop(&mut terminal);
 
     ratatui::restore();
 }

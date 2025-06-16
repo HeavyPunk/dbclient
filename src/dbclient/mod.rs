@@ -1,5 +1,6 @@
 //#[cfg(feature = "redis")]
 pub mod redis;
+pub mod dummy;
 
 pub mod query_builder;
 

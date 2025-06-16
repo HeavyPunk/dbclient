@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{layout::Rect, style::{Color, Style}, widgets::{Block, Borders, Paragraph}, Frame};
+use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Paragraph}, Frame, Terminal};
 
 use crate::ui2::Widget;
 
@@ -7,7 +7,10 @@ pub struct QueryResultWidget {
 
 }
 
-impl Widget for QueryResultWidget {
+impl<TerminalBackend> Widget<TerminalBackend> for QueryResultWidget
+where
+    TerminalBackend: Backend,
+{
     fn render(&mut self, frame: &mut Frame, rect: &Rect, is_selected: bool) {       
         let style = if is_selected {
             Style::default().fg(Color::Yellow)
@@ -20,7 +23,7 @@ impl Widget for QueryResultWidget {
         frame.render_widget(query_result_block, *rect);
     }
 
-    fn react_on_event(&mut self, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
+    fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
         match event {
             crate::ui2::UiEvent::None => crate::ui2::WidgetReaction::Nothing,
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {

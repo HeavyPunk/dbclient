@@ -1,23 +1,37 @@
+use std::sync::{Arc, Mutex};
+
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{layout::Rect, style::{Color, Style}, text::Text, widgets::{Block, Borders, List, Row}, Frame};
+use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, text::Text, widgets::{Block, Borders, List, Row}, Frame, Terminal};
 
 use crate::{dbclient::{fetcher::{FetchRequest, Fetcher}, query_builder::QueryElement}, ui2::Widget};
 
-pub struct DbObjectsWidget {
+pub struct DbObjectsWidget<Client>
+where
+    Client: Fetcher
+{
     selected_object_index: usize,
     db_objects: Option<Vec<String>>,
+    fetcher: Arc<Mutex<Client>>,
 }
 
-impl DbObjectsWidget {
-    pub fn new() -> Self {
+impl<'a, Client> DbObjectsWidget<Client>
+where
+    Client: Fetcher,
+{
+    pub fn new(fetcher: Arc<Mutex<Client>>) -> Self {
         Self {
             selected_object_index: 0,
-            db_objects: None
+            db_objects: None,
+            fetcher
         }
     }
 }
 
-impl Widget for DbObjectsWidget {
+impl<Client, TerminalBackend> Widget<TerminalBackend> for DbObjectsWidget<Client>
+where
+    Client: Fetcher,
+    TerminalBackend: Backend,
+{
     fn render(&mut self, frame: &mut Frame, rect: &Rect, is_selected: bool) {
         let style = if is_selected {
             Style::default().fg(Color::Yellow)
@@ -46,7 +60,7 @@ impl Widget for DbObjectsWidget {
         frame.render_widget(list, *rect);
     }
 
-    fn react_on_event(&mut self, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
+    fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
         match event {
             crate::ui2::UiEvent::None => crate::ui2::WidgetReaction::Nothing,
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {

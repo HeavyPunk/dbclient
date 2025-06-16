@@ -18,6 +18,6 @@ fn main() {
         .expect("Failed to parse config file");
 
     // ui::draw(&config);
-    ui2::draw(&config);
+    ui2::draw(config);
 }
 
