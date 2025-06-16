@@ -8,3 +8,8 @@ connection_type = "Redis"
 name = "prod"
 connection_string = "redis://127.0.0.1/"
 
+[[connections]]
+connection_type = "Postgres"
+name = "postgres_test"
+connection_string = "redis://127.0.0.1/"
+

@@ -5,6 +5,7 @@ use ratatui::{layout::Rect, prelude::Backend, Frame, Terminal};
 use crate::config::{self, Config};
 
 pub mod pages;
+pub mod pipe;
 
 pub enum UiEvent {
     None,

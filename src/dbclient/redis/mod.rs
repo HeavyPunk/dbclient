@@ -16,9 +16,13 @@ impl Fetcher for RedisFetcher {
         let mut connection = client.get_connection()?;
 
         let cmd = request.query.first().ok_or(super::fetcher::FetcherError::InvalidQuery)?;
+
         let cmd = match cmd {
             super::query_builder::QueryElement::Operator(op) => Ok(op),
             super::query_builder::QueryElement::Parameter(_, _) => Err(FetcherError::InvalidQuery),
+            super::query_builder::QueryElement::Select(_) => todo!(),
+            super::query_builder::QueryElement::From(_) => todo!(),
+            super::query_builder::QueryElement::Limit(_) => todo!(),
         }?;
 
         let mut res = &mut redis::cmd(cmd);
@@ -26,6 +30,9 @@ impl Fetcher for RedisFetcher {
             match i {
                 super::query_builder::QueryElement::Operator(op) => res = res.arg(op),
                 super::query_builder::QueryElement::Parameter(name, value) => res = res.arg(&[name, value]),
+                super::query_builder::QueryElement::Select(_) => todo!(),
+                super::query_builder::QueryElement::From(_) => todo!(),
+                super::query_builder::QueryElement::Limit(_) => todo!(),
             };
         }
 

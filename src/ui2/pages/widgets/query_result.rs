@@ -1,10 +1,22 @@
-use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Paragraph}, Frame, Terminal};
+use std::sync::{Arc, Mutex};
 
-use crate::ui2::Widget;
+use crossterm::event::{KeyCode, KeyEvent};
+use ratatui::{layout::{Constraint, Rect}, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Row, Table}, Frame, Terminal};
+
+use crate::{dbclient::fetcher::FetchResult, ui2::{pipe::Pipe, Widget}};
 
 pub struct QueryResultWidget {
+    pipe: Arc<Mutex<Pipe>>,
+    list: Option<FetchResult>
+}
 
+impl QueryResultWidget {
+    pub fn new(pipe: Arc<Mutex<Pipe>>) -> Self {
+        Self {
+            pipe,
+            list: None,
+        }
+    }
 }
 
 impl<TerminalBackend> Widget<TerminalBackend> for QueryResultWidget
@@ -18,7 +30,23 @@ where
             Style::default()
         };
 
-        let query_result_block = Paragraph::new("None")
+        let mut pipe = self.pipe.lock().unwrap();
+        match pipe.try_get_db_objects() {
+            Ok(res) => self.list = Some(res),
+            Err(_) => (),
+        };
+
+        let rows = match &self.list {
+            Some(r) => match &r.rows {
+                Some(rows) => rows.iter().map(|row| Row::new(row.columns.clone())).collect(),
+                None => vec![Row::new(vec!["None"])],
+            },
+            None => vec![Row::new(vec!["None"])],
+        };
+
+        let widths = vec![Constraint::Fill(1); rows.len()];
+
+        let query_result_block = Table::new(rows, widths)
             .block(Block::new().title("Result").borders(Borders::all()).style(style));
         frame.render_widget(query_result_block, *rect);
     }

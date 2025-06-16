@@ -1,10 +1,18 @@
+use std::sync::{Arc, Mutex};
+
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Paragraph}, Frame, Terminal};
 
-use crate::ui2::Widget;
+use crate::ui2::{pipe::Pipe, Widget};
 
 pub struct QueryLineWidget {
+    pipe: Arc<Mutex<Pipe>>
+}
 
+impl QueryLineWidget {
+    pub fn new(pipe: Arc<Mutex<Pipe>>) -> Self {
+        Self { pipe }
+    }
 }
 
 impl<TerminalBackend> Widget<TerminalBackend> for QueryLineWidget

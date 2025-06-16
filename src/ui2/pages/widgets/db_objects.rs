@@ -1,9 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, text::Text, widgets::{Block, Borders, List, Row}, Frame, Terminal};
+use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, text::Text, widgets::{Block, Borders, List}, Frame, Terminal};
 
-use crate::{dbclient::{fetcher::{FetchRequest, Fetcher}, query_builder::QueryElement}, ui2::Widget};
+use crate::{dbclient::{fetcher::{self, FetchRequest, Fetcher}, query_builder::QueryElement}, ui2::{pipe::{Payload, Pipe}, Widget}};
 
 pub struct DbObjectsWidget<Client>
 where
@@ -12,17 +12,19 @@ where
     selected_object_index: usize,
     db_objects: Option<Vec<String>>,
     fetcher: Arc<Mutex<Client>>,
+    pipe: Arc<Mutex<Pipe>>,
 }
 
 impl<'a, Client> DbObjectsWidget<Client>
 where
     Client: Fetcher,
 {
-    pub fn new(fetcher: Arc<Mutex<Client>>) -> Self {
+    pub fn new(fetcher: Arc<Mutex<Client>>, pipe: Arc<Mutex<Pipe>>) -> Self {
         Self {
             selected_object_index: 0,
             db_objects: None,
-            fetcher
+            fetcher,
+            pipe
         }
     }
 }
@@ -40,7 +42,16 @@ where
         };
 
         if let None = self.db_objects {
-            self.db_objects = Some(list_database_objects());
+            let mut fetcher = self.fetcher.lock().unwrap();
+
+            let list = match fetcher.fetch_db_objects() {
+                Ok(res) => match &res.rows {
+                    Some(rows) => rows.iter().map(|row| row.columns.join(" ").to_string()).collect(),
+                    None => vec![],
+                },
+                Err(_) => vec![],
+            };
+            self.db_objects = Some(list);
         }
 
         let buf: Vec<Text<'_>> = self.db_objects.as_ref().unwrap()
@@ -67,6 +78,28 @@ where
                 match key_event {
                     KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => crate::ui2::WidgetReaction::ExitFromWidget,
                     KeyEvent { code: KeyCode::Enter, modifiers: _, kind: _, state: _ } => {
+                        match &self.db_objects {
+                            Some(objs) => {
+                                match objs.get(self.selected_object_index) {
+                                    Some(obj) => {
+                                        let mut fetcher = self.fetcher.lock().unwrap();
+                                        let req = FetchRequest {
+                                            query: vec![QueryElement::Select(String::from("*")), QueryElement::From(obj.to_string())],
+                                            limit: 100
+                                        };
+                                        match fetcher.fetch(&req) {
+                                            Ok(res) => {
+                                                let mut pipe = self.pipe.lock().unwrap();
+                                                pipe.push_message(Payload::DbObjects(res));
+                                            },
+                                            Err(_) => (),
+                                        }
+                                    },
+                                    None => (),
+                                }
+                            },
+                            None => (),
+                        };
                         crate::ui2::WidgetReaction::Nothing //TODO: list object items
                     },
                     KeyEvent { code: KeyCode::Char('j'), modifiers: _, kind: _, state: _ } => {
@@ -91,9 +124,14 @@ where
     }
 }
 
-// fn list_database_objects(client: &mut impl Fetcher) -> Vec<String> {
-fn list_database_objects() -> Vec<String> {
-    vec![String::from("users"), String::from("tokens"), String::from("files")]
+fn list_database_objects(client: &mut impl Fetcher) -> Vec<String> {
+    match client.fetch_db_objects() {
+        Ok(res) => match &res.rows {
+            Some(rows) => rows.iter().map(|row| row.columns.join(" ").to_string()).collect(),
+            None => vec![],
+        },
+        Err(_) => vec![],
+    }
     // let query = vec![QueryElement::Operator(String::from("KEYS")), QueryElement::Operator(String::from("*"))];
     // let fetch_result = client.fetch(&FetchRequest { query, limit: usize::MAX }).expect("client error");
     //

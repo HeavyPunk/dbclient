@@ -62,11 +62,11 @@ where
                                 run_query_page(terminal, fetcher);
                             },
                             crate::config::ConnectionType::Postgres => {
-                                let fetcher = DummyFetcher {  };
+                                let fetcher = DummyFetcher::new();
                                 run_query_page(terminal, fetcher);
                             },
                             crate::config::ConnectionType::MySql => {
-                                let fetcher = DummyFetcher {  };
+                                let fetcher = DummyFetcher::new();
                                 run_query_page(terminal, fetcher);
                             },
                         };

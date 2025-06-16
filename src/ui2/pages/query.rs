@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use ratatui::{layout::{Constraint, Layout, Rect}, prelude::Backend, Terminal};
 
-use crate::{dbclient::fetcher::Fetcher, ui2::{Renderer, Widget}};
+use crate::{dbclient::fetcher::Fetcher, ui2::{pipe::Pipe, Renderer, Widget}};
 
 use super::widgets::{db_objects::DbObjectsWidget, query_line::QueryLineWidget, query_result::QueryResultWidget};
 
@@ -29,9 +29,12 @@ where
             let [units_list, query_area] = horizontal.areas(frame.area());
             let vertical = Layout::vertical([Constraint::Fill(1), Constraint::Fill(10)]);
             let [query_line_area, query_result_area] = vertical.areas(query_area);
-            let db_objects_widget = DbObjectsWidget::new(fetcher_arc.clone());
-            let query_line_widget = QueryLineWidget {};
-            let query_result_widget = QueryResultWidget {};
+
+            let pipe = Arc::new(Mutex::new(Pipe::new()));
+            let db_objects_widget = DbObjectsWidget::new(fetcher_arc.clone(), pipe.clone());
+            let query_line_widget = QueryLineWidget::new(pipe.clone());
+            let query_result_widget = QueryResultWidget::new(pipe.clone());
+
             let widgets: Vec<(Rect, Box<dyn Widget<TerminalBackend>>, usize)> = vec![
                 (units_list, Box::new(db_objects_widget), 0),
                 (query_line_area, Box::new(query_line_widget), 1),
