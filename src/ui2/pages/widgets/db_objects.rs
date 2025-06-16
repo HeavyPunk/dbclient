@@ -66,7 +66,9 @@ where
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {
                 match key_event {
                     KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => crate::ui2::WidgetReaction::ExitFromWidget,
-                    KeyEvent { code: KeyCode::Enter, modifiers: _, kind: _, state: _ } => crate::ui2::WidgetReaction::Nothing, //TODO: list object items
+                    KeyEvent { code: KeyCode::Enter, modifiers: _, kind: _, state: _ } => {
+                        crate::ui2::WidgetReaction::Nothing //TODO: list object items
+                    },
                     KeyEvent { code: KeyCode::Char('j'), modifiers: _, kind: _, state: _ } => {
                         if let Some(db_objects) = &self.db_objects {
                             if self.selected_object_index < db_objects.len() - 1 {

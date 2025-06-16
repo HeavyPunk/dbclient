@@ -38,6 +38,7 @@ pub(crate) mod fetcher {
     }
 
     pub trait Fetcher {
+        fn fetch_db_objects(&mut self) -> Result<FetchResult, FetcherError>;
         fn fetch(&mut self, request: &FetchRequest) -> Result<FetchResult, FetcherError>;
     }
 

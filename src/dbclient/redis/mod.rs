@@ -32,6 +32,10 @@ impl Fetcher for RedisFetcher {
         let res = res.query(&mut connection)?;
         Ok(res)
     }
+
+    fn fetch_db_objects(&mut self) -> Result<FetchResult, FetcherError> {
+        todo!()
+    }
 }
 
 impl FromRedisValue for FetchResult {
