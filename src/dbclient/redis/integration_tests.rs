@@ -1,6 +1,6 @@
 use std::{collections::HashMap, usize};
 
-use crate::dbclient::{fetcher::{FetchRequest, FetchResult, Fetcher, Row}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}};
+use crate::dbclient::{fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}};
 
 
 #[test]

@@ -33,7 +33,6 @@ where
 
     fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
         match event {
-            crate::ui2::UiEvent::None => crate::ui2::WidgetReaction::Nothing,
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {
                 match key_event {
                     KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => crate::ui2::WidgetReaction::ExitFromWidget,

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{layout::{Constraint, Rect}, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Row, Table}, Frame, Terminal};
@@ -66,7 +66,6 @@ where
 
     fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
         match event {
-            crate::ui2::UiEvent::None => crate::ui2::WidgetReaction::Nothing,
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {
                 match key_event {
                     KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => crate::ui2::WidgetReaction::ExitFromWidget,

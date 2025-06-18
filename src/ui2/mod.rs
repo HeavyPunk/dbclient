@@ -1,14 +1,13 @@
 use crossterm::event::{self, KeyCode, KeyEvent};
-use pages::{main::MainPage, query::QueryPage};
+use pages::main::MainPage;
 use ratatui::{layout::Rect, prelude::Backend, Frame, Terminal};
 
-use crate::config::{self, Config};
+use crate::config::Config;
 
 pub mod pages;
 pub mod pipe;
 
 pub enum UiEvent {
-    None,
     KeyboardEvent(KeyEvent),
 }
 

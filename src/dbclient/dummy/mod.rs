@@ -13,7 +13,7 @@ impl DummyFetcher {
 }
 
 impl Fetcher for DummyFetcher {
-    fn fetch(&mut self, request: &super::fetcher::FetchRequest) -> Result<super::fetcher::FetchResult, super::fetcher::FetcherError> {
+    fn fetch(&mut self, _: &super::fetcher::FetchRequest) -> Result<super::fetcher::FetchResult, super::fetcher::FetcherError> {
         Ok(FetchResult::multiple(&self.objects))
     }
 

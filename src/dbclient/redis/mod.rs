@@ -1,4 +1,4 @@
-use redis::{cmd, Connection, ConnectionLike as _, FromRedisValue, RedisError, Value};
+use redis::{Connection, ConnectionLike as _, FromRedisValue, RedisError, Value};
 
 use super::{fetcher::{FetchResult, Fetcher, FetcherError}, query_builder::QueryElement};
 

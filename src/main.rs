@@ -5,7 +5,6 @@ use config::Config;
 mod cli;
 mod config;
 mod dbclient;
-mod ui;
 mod ui2;
 
 fn main() {
@@ -17,7 +16,6 @@ fn main() {
     let config: Config = toml::from_str(&config_content)
         .expect("Failed to parse config file");
 
-    // ui::draw(&config);
     ui2::draw(config);
 }
 

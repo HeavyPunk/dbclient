@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, text::Text, widgets::{Block, Borders, List}, Frame, Terminal};
 
-use crate::{dbclient::{fetcher::{self, FetchRequest, Fetcher}, query_builder::QueryElement}, ui2::{pipe::{Payload, Pipe}, Widget}};
+use crate::{dbclient::{fetcher::{FetchRequest, Fetcher}, query_builder::QueryElement}, ui2::{pipe::{Payload, Pipe}, Widget}};
 
 pub struct DbObjectsWidget<Client>
 where
@@ -76,7 +76,6 @@ where
 
     fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
         match event {
-            crate::ui2::UiEvent::None => crate::ui2::WidgetReaction::Nothing,
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {
                 match key_event {
                     KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => crate::ui2::WidgetReaction::ExitFromWidget,
@@ -126,25 +125,4 @@ where
         }
     }
 }
-
-fn list_database_objects(client: &mut impl Fetcher) -> Vec<String> {
-    match client.fetch_db_objects() {
-        Ok(res) => match &res.table {
-            Some(rows) => match rows.iter().last() {
-                Some((_, vals)) => vals.to_vec(),
-                None => vec![],
-            },
-            None => vec![],
-        },
-        Err(_) => vec![],
-    }
-    // let query = vec![QueryElement::Operator(String::from("KEYS")), QueryElement::Operator(String::from("*"))];
-    // let fetch_result = client.fetch(&FetchRequest { query, limit: usize::MAX }).expect("client error");
-    //
-    // match fetch_result.rows {
-    //     Some(rows) => rows.iter().map(|row| row.columns.join(" ").to_string()).collect(),
-    //     None => vec![],
-    // }
-}
-
 
