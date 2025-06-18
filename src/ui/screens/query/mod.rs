@@ -152,11 +152,15 @@ where
 }
 
 fn list_database_objects(client: &mut impl Fetcher) -> Vec<String> {
-    let query = vec![QueryElement::Operator(String::from("KEYS")), QueryElement::Operator(String::from("*"))];
+    // let query = vec![QueryElement::Operator(String::from("KEYS")), QueryElement::Operator(String::from("*"))];
+    let query = vec![QueryElement::RawQuery("KEYS *".to_string())];
     let fetch_result = client.fetch(&FetchRequest { query, limit: usize::MAX }).expect("client error");
     
-    match fetch_result.rows {
-        Some(rows) => rows.iter().map(|row| row.columns.join(" ").to_string()).collect(),
+    match fetch_result.table {
+        Some(rows) => match rows.iter().last() {
+            Some((_, vals)) => vals.to_vec(),
+            None => vec![],
+        },
         None => vec![],
     }
 }

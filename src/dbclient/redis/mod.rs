@@ -1,6 +1,6 @@
-use redis::{FromRedisValue, RedisError};
+use redis::{cmd, Connection, ConnectionLike as _, FromRedisValue, RedisError, Value};
 
-use super::fetcher::{FetchResult, Fetcher, FetcherError};
+use super::{fetcher::{FetchResult, Fetcher, FetcherError}, query_builder::QueryElement};
 
 pub struct RedisConfig {
     pub uri: String
@@ -10,38 +10,82 @@ pub struct RedisFetcher {
     pub config: RedisConfig
 }
 
+pub enum RedisType {
+    String,
+    List,
+    Set,
+    Zset,
+    Hash,
+    Stream,
+    None,
+}
+
 impl Fetcher for RedisFetcher {
     fn fetch(&mut self, request: &super::fetcher::FetchRequest) -> Result<super::fetcher::FetchResult, super::fetcher::FetcherError> {
         let client = redis::Client::open(self.config.uri.clone())?;
         let mut connection = client.get_connection()?;
 
-        let cmd = request.query.first().ok_or(super::fetcher::FetcherError::InvalidQuery)?;
-
-        let cmd = match cmd {
-            super::query_builder::QueryElement::Operator(op) => Ok(op),
-            super::query_builder::QueryElement::Parameter(_, _) => Err(FetcherError::InvalidQuery),
-            super::query_builder::QueryElement::Select(_) => todo!(),
-            super::query_builder::QueryElement::From(_) => todo!(),
-            super::query_builder::QueryElement::Limit(_) => todo!(),
-        }?;
-
-        let mut res = &mut redis::cmd(cmd);
-        for i in request.query.iter().skip(1) {
-            match i {
-                super::query_builder::QueryElement::Operator(op) => res = res.arg(op),
-                super::query_builder::QueryElement::Parameter(name, value) => res = res.arg(&[name, value]),
-                super::query_builder::QueryElement::Select(_) => todo!(),
-                super::query_builder::QueryElement::From(_) => todo!(),
-                super::query_builder::QueryElement::Limit(_) => todo!(),
-            };
+        match request.query.first() {
+            Some(query) => match query {
+                QueryElement::RawQuery(query) => {
+                    let packed_query = redis::cmd(&query).get_packed_command();
+                    let res = connection.req_packed_command(&packed_query)?;
+                    Ok(FetchResult::from_redis_value(&res)?)
+                },
+                QueryElement::ListAllItemsFrom(index) => {
+                    let index_type = get_index_type(index, &mut connection)?;
+                    let res = match index_type {
+                        RedisType::String => connection.req_command(&redis::cmd("GET").arg(index))?,
+                        RedisType::List => connection.req_command(&redis::cmd("LRANGE").arg(index).arg(0).arg(-1))?,
+                        RedisType::Set => connection.req_command(&redis::cmd("SMEMBERS").arg(index))?,
+                        RedisType::Zset => connection.req_command(&redis::cmd("ZRANGE").arg(index).arg(0).arg(-1))?,
+                        RedisType::Hash => connection.req_command(&redis::cmd("HGETALL").arg(index))?,
+                        RedisType::Stream => connection.req_command(&redis::cmd("XRANGE").arg(index).arg("-").arg("+"))?,
+                        RedisType::None => Value::Nil,
+                    };
+                    
+                    Ok(FetchResult::from_redis_value(&res)?)
+                },
+            },
+            None => Err(FetcherError::InvalidQuery),
         }
-
-        let res = res.query(&mut connection)?;
-        Ok(res)
     }
 
     fn fetch_db_objects(&mut self) -> Result<FetchResult, FetcherError> {
-        todo!()
+        let client = redis::Client::open(self.config.uri.clone())?;
+        let mut connection = client.get_connection()?;
+
+        let mut cmd = redis::cmd("KEYS");
+        let cmd = cmd.arg("*");
+        let res = cmd.query(&mut connection)?;
+        Ok(res)
+    }
+}
+
+fn get_index_type(index: &String, mut connection: &mut Connection) -> Result<RedisType, FetcherError> {
+    let mut type_cmd = redis::cmd("TYPE");
+    let type_cmd = type_cmd.arg(index);
+    let type_res = type_cmd.query::<FetchResult>(&mut connection)?;
+    match type_res.table {
+        Some(table) => {
+            match table.iter().last() {
+                Some((_, column)) => match column.first() {
+                    Some(val) => match val.as_str() {
+                        "string" => Ok(RedisType::String),
+                        "list" => Ok(RedisType::List),
+                        "set" => Ok(RedisType::Set),
+                        "zset" => Ok(RedisType::Zset),
+                        "hash" => Ok(RedisType::Hash),
+                        "stream" => Ok(RedisType::Stream),
+                        "none" => Ok(RedisType::None),
+                        _ => Err(FetcherError::InvalidQuery)
+                    },
+                    None => Err(FetcherError::InvalidQuery),
+                },
+                None => Err(FetcherError::InvalidQuery),
+            }
+        },
+        None => Err(FetcherError::InvalidQuery),
     }
 }
 
@@ -50,7 +94,10 @@ impl FromRedisValue for FetchResult {
         match v {
             redis::Value::Nil => Ok(FetchResult::none()),
             redis::Value::Int(x) => Ok(FetchResult::single(x)),
-            redis::Value::BulkString(items) => Ok(FetchResult::multiple(items)),
+            redis::Value::BulkString(items) => {
+                let string_result = String::from_utf8(items.clone()).map_err(|_| RedisError::from((redis::ErrorKind::TypeError, "Invalid UTF-8 in BulkString")))?;
+                Ok(FetchResult::single(&string_result))
+            },
             redis::Value::Array(values) => {
                 let mut res = FetchResult::none();
                 for value in values {

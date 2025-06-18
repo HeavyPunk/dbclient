@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{layout::{Constraint, Rect}, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Row, Table}, Frame, Terminal};
@@ -37,16 +37,29 @@ where
         };
 
         let rows = match &self.list {
-            Some(r) => match &r.rows {
-                Some(rows) => rows.iter().map(|row| Row::new(row.columns.clone())).collect(),
-                None => vec![Row::new(vec!["None"])],
+            Some(r) => match &r.table {
+                Some(columns) => {
+                    let headers: Vec<String> = columns.keys().cloned().collect();
+                    let mut data_rows: Vec<Row> = vec![];
+                    
+                    let max_len = columns.values().map(|v| v.len()).max().unwrap_or(0);
+                    for i in 0..max_len {
+                        let row_data: Vec<String> = columns.values()
+                            .map(|column| column.get(i).cloned().unwrap_or_else(|| "".to_string()))
+                            .collect();
+                        data_rows.push(Row::new(row_data));
+                    }
+                    (headers, data_rows)
+                },
+                None => (vec!["None".to_string()], vec![Row::new(vec!["None"])])
             },
-            None => vec![Row::new(vec!["None"])],
+            None => (vec!["None".to_string()], vec![Row::new(vec!["None"])])
         };
 
-        let widths = vec![Constraint::Fill(1); rows.len()];
+        let widths = vec![Constraint::Fill(1); rows.0.len()];
 
-        let query_result_block = Table::new(rows, widths)
+        let query_result_block = Table::new(rows.1, widths)
+            .header(Row::new(rows.0).style(Style::default().bg(Color::Blue).fg(Color::Black)))
             .block(Block::new().title("Result").borders(Borders::all()).style(style));
         frame.render_widget(query_result_block, *rect);
     }

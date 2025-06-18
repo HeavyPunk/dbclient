@@ -45,8 +45,11 @@ where
             let mut fetcher = self.fetcher.lock().unwrap();
 
             let list = match fetcher.fetch_db_objects() {
-                Ok(res) => match &res.rows {
-                    Some(rows) => rows.iter().map(|row| row.columns.join(" ").to_string()).collect(),
+                Ok(res) => match &res.table {
+                    Some(rows) => match rows.iter().last() {
+                        Some((_, vals)) => vals.to_vec(),
+                        None => vec![],
+                    },
                     None => vec![],
                 },
                 Err(_) => vec![],
@@ -84,13 +87,13 @@ where
                                     Some(obj) => {
                                         let mut fetcher = self.fetcher.lock().unwrap();
                                         let req = FetchRequest {
-                                            query: vec![QueryElement::Select(String::from("*")), QueryElement::From(obj.to_string())],
+                                            query: vec![QueryElement::ListAllItemsFrom(obj.to_string())],
                                             limit: 100
                                         };
                                         match fetcher.fetch(&req) {
                                             Ok(res) => {
                                                 let mut pipe = self.pipe.lock().unwrap();
-                                                pipe.push_message(Payload::DbObjects(res));
+                                                let _ = pipe.push_message(Payload::DbObjects(res));
                                             },
                                             Err(_) => (),
                                         }
@@ -126,8 +129,11 @@ where
 
 fn list_database_objects(client: &mut impl Fetcher) -> Vec<String> {
     match client.fetch_db_objects() {
-        Ok(res) => match &res.rows {
-            Some(rows) => rows.iter().map(|row| row.columns.join(" ").to_string()).collect(),
+        Ok(res) => match &res.table {
+            Some(rows) => match rows.iter().last() {
+                Some((_, vals)) => vals.to_vec(),
+                None => vec![],
+            },
             None => vec![],
         },
         Err(_) => vec![],

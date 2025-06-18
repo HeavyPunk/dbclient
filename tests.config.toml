@@ -1,7 +1,7 @@
 [[connections]]
 connection_type = "Redis"
 name = "default"
-connection_string = "redis://127.0.0.1/"
+connection_string = "redis://127.0.0.1:6379/"
 
 [[connections]]
 connection_type = "Redis"

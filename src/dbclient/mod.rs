@@ -5,16 +5,17 @@ pub mod dummy;
 pub mod query_builder;
 
 pub(crate) mod fetcher {
+    use std::collections::HashMap;
+
     use super::query_builder::QueryElement;
 
 
     #[derive(Debug, PartialEq)]
     pub struct FetchResult {
-        pub header: Option<Row>,
-        pub rows: Option<Vec<Row>>
+        pub table: Option<HashMap<String, Vec<String>>>,
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Clone)]
     pub struct Row {
         pub columns: Vec<String>
     }
@@ -44,33 +45,38 @@ pub(crate) mod fetcher {
 
     impl FetchResult {
         pub fn none() -> FetchResult {
-            FetchResult { header: None, rows: None }
+            FetchResult { table: None }
         }
 
         pub fn single<T>(item: &T) -> FetchResult where T: ToString {
+            let mut table = HashMap::new();
+            table.insert("result".to_string(), vec![item.to_string()]);
+
             FetchResult {
-                header: Some(
-                    Row {
-                        columns: vec![String::from("result")]
-                    }
-                ),
-                rows: Some(vec![Row {
-                    columns: vec![item.to_string()]
-                }])
+                table: Some(table),
             }
         }
 
         pub fn multiple<T>(items: &Vec<T>) -> FetchResult where T: ToString {
-            FetchResult {
-                header: Some(Row {
-                    columns: vec![String::from("result")]
-                }),
-                rows: Some(items.iter().map(|item| Row {columns: vec![item.to_string()]}).collect())
-            }
+            let mut table = HashMap::new();
+            table.insert("result".to_string(), items.iter().map(|item| item.to_string()).collect());
+            FetchResult { table: Some(table) }
         }
 
         pub fn merge(result1: &FetchResult, result2: &FetchResult) -> FetchResult {
-            todo!()
+            let table = match (result1.table.clone(), result2.table.clone()) {
+                (None, None) => None,
+                (None, Some(t)) => Some(t),
+                (Some(t), None) => Some(t),
+                (Some(t1), Some(t2)) => {
+                    let mut merged_table = t1.clone();
+                    for (key, value) in t2 {
+                        merged_table.entry(key).or_insert_with(Vec::new).extend(value);
+                    }
+                    Some(merged_table)
+                },
+            };
+            FetchResult { table }
         }
     }
 }
