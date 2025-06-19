@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{layout::Constraint, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Row, Table}, Terminal};
 
-use crate::{config::Connection, dbclient::{dummy::DummyFetcher, fetcher::Fetcher, redis::{RedisConfig, RedisFetcher}}, ui2::{pages::query::QueryPage, Widget}};
+use crate::{config::Connection, dbclient::{dummy::DummyFetcher, fetcher::Fetcher, redis::{RedisConfig, RedisFetcher}}, ui2::{pages::query::QueryPage, ui_mode::UserMode, Widget}};
 
 
 pub struct ConnectionsListWidget {
@@ -22,7 +22,7 @@ impl<TerminalBackend> Widget<TerminalBackend> for ConnectionsListWidget
 where
     TerminalBackend: Backend,
 {
-    fn render(&mut self, frame: &mut ratatui::Frame, rect: &ratatui::prelude::Rect, is_selected: bool) {
+    fn render(&mut self, frame: &mut ratatui::Frame, rect: &ratatui::prelude::Rect, user_mode: &UserMode, is_selected: bool) {
         let style = if is_selected {
             Style::default().fg(Color::Yellow)
         } else {
@@ -45,7 +45,7 @@ where
         frame.render_widget(connection_table, *rect);
     }
 
-    fn react_on_event(&mut self, terminal: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
+    fn react_on_event(&mut self, terminal: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent, user_mode: &UserMode) -> crate::ui2::WidgetReaction {
         match event {
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {
                 match key_event {

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{layout::{Constraint, Rect}, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Row, Table}, Frame, Terminal};
 
-use crate::{dbclient::fetcher::FetchResult, ui2::{pipe::Pipe, Widget}};
+use crate::{dbclient::fetcher::FetchResult, ui2::{pipe::Pipe, ui_mode::UserMode, Widget}};
 
 pub struct QueryResultWidget {
     pipe: Arc<Mutex<Pipe>>,
@@ -23,7 +23,7 @@ impl<TerminalBackend> Widget<TerminalBackend> for QueryResultWidget
 where
     TerminalBackend: Backend,
 {
-    fn render(&mut self, frame: &mut Frame, rect: &Rect, is_selected: bool) {       
+    fn render(&mut self, frame: &mut Frame, rect: &Rect, user_mode: &UserMode, is_selected: bool) {       
         let style = if is_selected {
             Style::default().fg(Color::Yellow)
         } else {
@@ -64,7 +64,7 @@ where
         frame.render_widget(query_result_block, *rect);
     }
 
-    fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
+    fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent, user_mode: &UserMode) -> crate::ui2::WidgetReaction {
         match event {
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {
                 match key_event {

@@ -3,15 +3,16 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Paragraph}, Frame, Terminal};
 
-use crate::ui2::{pipe::Pipe, Widget};
+use crate::ui2::{pipe::Pipe, ui_mode::UserMode, Widget};
 
 pub struct QueryLineWidget {
-    pipe: Arc<Mutex<Pipe>>
+    pipe: Arc<Mutex<Pipe>>,
+    query: String
 }
 
 impl QueryLineWidget {
     pub fn new(pipe: Arc<Mutex<Pipe>>) -> Self {
-        Self { pipe }
+        Self { pipe, query: "".to_string() }
     }
 }
 
@@ -19,19 +20,19 @@ impl<TerminalBackend> Widget<TerminalBackend> for QueryLineWidget
 where
     TerminalBackend: Backend,
 {
-    fn render(&mut self, frame: &mut Frame, rect: &Rect, is_selected: bool) {
+    fn render(&mut self, frame: &mut Frame, rect: &Rect, user_mode: &UserMode, is_selected: bool) {
         let style = if is_selected {
             Style::default().fg(Color::Yellow)
         } else {
             Style::default()
         };
 
-        let query_line_block = Paragraph::new("Lalala")
+        let query_line_block = Paragraph::new(self.query.clone())
             .block(Block::new().title("Query").borders(Borders::all()).style(style));
         frame.render_widget(query_line_block, *rect);
     }
 
-    fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
+    fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent, user_mode: &UserMode) -> crate::ui2::WidgetReaction {
         match event {
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {
                 match key_event {

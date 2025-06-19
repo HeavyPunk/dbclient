@@ -4,7 +4,7 @@ use ratatui::{layout::{Constraint, Layout, Rect}, prelude::Backend, Terminal};
 
 use crate::{dbclient::fetcher::Fetcher, ui2::{pipe::Pipe, Renderer, Widget}};
 
-use super::widgets::{db_objects::DbObjectsWidget, query_line::QueryLineWidget, query_result::QueryResultWidget};
+use super::widgets::{db_objects::DbObjectsWidget, query_line::QueryLineWidget, query_result::QueryResultWidget, user_mode::UserModeWidget};
 
 pub struct QueryPage<Client, TerminalBackend>
 where
@@ -27,18 +27,20 @@ where
 
             let horizontal = Layout::horizontal([Constraint::Fill(1), Constraint::Fill(3)]);
             let [units_list, query_area] = horizontal.areas(frame.area());
-            let vertical = Layout::vertical([Constraint::Fill(1), Constraint::Fill(10)]);
-            let [query_line_area, query_result_area] = vertical.areas(query_area);
+            let vertical = Layout::vertical([Constraint::Fill(1), Constraint::Fill(10), Constraint::Length(1)]);
+            let [query_line_area, query_result_area, user_mode_area] = vertical.areas(query_area);
 
             let pipe = Arc::new(Mutex::new(Pipe::new()));
             let db_objects_widget = DbObjectsWidget::new(fetcher_arc.clone(), pipe.clone());
             let query_line_widget = QueryLineWidget::new(pipe.clone());
             let query_result_widget = QueryResultWidget::new(pipe.clone());
+            let user_mode_widget = UserModeWidget::new();
 
             let widgets: Vec<(Rect, Box<dyn Widget<TerminalBackend>>, usize)> = vec![
                 (units_list, Box::new(db_objects_widget), 0),
                 (query_line_area, Box::new(query_line_widget), 1),
                 (query_result_area, Box::new(query_result_widget), 2),
+                (user_mode_area, Box::new(user_mode_widget), 3),
             ];
             renderer = Some(Renderer::new(widgets))
 
