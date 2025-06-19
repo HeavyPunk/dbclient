@@ -55,9 +55,25 @@ impl Fetcher for RedisFetcher {
         let client = redis::Client::open(self.config.uri.clone())?;
         let mut connection = client.get_connection()?;
 
-        let mut cmd = redis::cmd("KEYS");
-        let cmd = cmd.arg("*");
-        let res = cmd.query(&mut connection)?;
+        let mut cursor = 0;
+        let mut res = FetchResult::none();
+
+        loop {
+            let mut cmd = redis::cmd("SCAN");
+            let cmd = cmd.arg(cursor).arg("MATCH").arg("*");
+            let scan_res: (u64, Vec<String>) = cmd.query(&mut connection)?;
+
+            cursor = scan_res.0;
+            let keys = FetchResult::from_redis_value(&redis::Value::Array(
+                scan_res.1.into_iter().map(redis::Value::SimpleString).collect(),
+            ))?;
+            res = FetchResult::merge(&res, &keys);
+
+            if cursor == 0 {
+                break;
+            }
+        }
+
         Ok(res)
     }
 }

@@ -35,13 +35,15 @@ where
     TerminalBackend: Backend,
 {
     fn render(&mut self, frame: &mut Frame, rect: &Rect, is_selected: bool) {
+        use ratatui::widgets::ListState;
+
         let style = if is_selected {
             Style::default().fg(Color::Yellow)
         } else {
             Style::default()
         };
 
-        if let None = self.db_objects {
+        if self.db_objects.is_none() {
             let mut fetcher = self.fetcher.lock().unwrap();
 
             let list = match fetcher.fetch_db_objects() {
@@ -61,17 +63,20 @@ where
             .iter()
             .enumerate()
             .map(|(index, elem)| {
-                let style = if index == self.selected_object_index {
-                    Style::default().bg(Color::Yellow).fg(Color::Black)
+                if index == self.selected_object_index {
+                    Text::styled(elem.clone(), Style::default().bg(Color::Yellow).fg(Color::Black))
                 } else {
-                    Style::default()
-                };
-                Text::from(elem.clone()).style(style)
+                    Text::from(elem.clone())
+                }
             })
             .collect();
+
+        let mut list_state = ListState::default();
+        list_state.select(Some(self.selected_object_index));
+
         let list = List::new(buf)
             .block(Block::new().title("Database Objects").borders(Borders::all()).style(style));
-        frame.render_widget(list, *rect);
+        frame.render_stateful_widget(list, *rect, &mut list_state);
     }
 
     fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent) -> crate::ui2::WidgetReaction {
