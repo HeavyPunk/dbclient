@@ -15,6 +15,15 @@ pub(crate) mod fetcher {
         pub table: Option<HashMap<String, Vec<String>>>,
     }
 
+    impl FetchResult {
+        pub fn get_table_height(&self) -> usize {
+            match &self.table {
+                Some(table) => table.values().map(|v| v.len()).max().unwrap_or(0),
+                None => 0,
+            }
+        }
+    }
+
     #[derive(Debug, PartialEq, Clone)]
     pub struct Row {
         pub columns: Vec<String>
