@@ -1,14 +1,16 @@
+use std::sync::{Arc, Mutex};
+
 use ratatui::{prelude::Backend, style::{Color, Style}, widgets::{Block, Borders, Padding, Paragraph}};
 
-use crate::ui2::Widget;
+use crate::ui2::{pipe::Pipe, ui_mode::UserMode, Widget};
 
 pub struct UserModeWidget {
-
+    pipe: Arc<Mutex<Pipe>>,
 }
 
 impl UserModeWidget {
-    pub fn new() -> Self {
-        Self {  }
+    pub fn new(pipe: Arc<Mutex<Pipe>>) -> Self {
+        Self { pipe }
     }
 }
 
@@ -16,12 +18,19 @@ impl<TerminalBackend> Widget<TerminalBackend> for UserModeWidget
 where
     TerminalBackend: Backend,
 {
-    fn render(&mut self, frame: &mut ratatui::Frame, rect: &ratatui::prelude::Rect, user_mode: &crate::ui2::ui_mode::UserMode, _: bool) {
+    fn render(&mut self, frame: &mut ratatui::Frame, rect: &ratatui::prelude::Rect, user_mode: &UserMode, _: bool) {
         let (text, color) = match user_mode {
-            crate::ui2::ui_mode::UserMode::Normal => ("NORMAL", Color::LightBlue),
-            crate::ui2::ui_mode::UserMode::Insert => ("INSERT", Color::LightGreen),
-            crate::ui2::ui_mode::UserMode::SearchInput => ("SEARCH", Color::Yellow),
-            crate::ui2::ui_mode::UserMode::Search(_, _) => ("SEARCH", Color::Yellow),
+            UserMode::Normal => ("NORMAL".to_string(), Color::LightBlue),
+            UserMode::Insert => ("INSERT".to_string(), Color::LightGreen),
+            UserMode::SearchInput => ("SEARCH".to_string(), Color::Yellow),
+            UserMode::Search(_, _) => ("SEARCH".to_string(), Color::Yellow),
+            UserMode::Command => ({
+                let mut pipe = self.pipe.lock().unwrap();
+                match pipe.try_get_user_mode() {
+                    Ok(cmd) => format!("COMMAND :{}", cmd),
+                    Err(_) => "COMMAND".to_string(),
+                }
+            }, Color::Magenta),
         };
         let user_mode = Paragraph::new(text)
             .block(Block::new()
@@ -31,7 +40,7 @@ where
         frame.render_widget(user_mode, *rect);
     }
 
-    fn react_on_event(&mut self, _: &mut ratatui::Terminal<TerminalBackend>, _: crate::ui2::UiEvent, _: &crate::ui2::ui_mode::UserMode) -> crate::ui2::WidgetReaction {
+    fn react_on_event(&mut self, _: &mut ratatui::Terminal<TerminalBackend>, _: crate::ui2::UiEvent, _: &UserMode) -> crate::ui2::WidgetReaction {
         crate::ui2::WidgetReaction::ExitFromWidget
     }
 }

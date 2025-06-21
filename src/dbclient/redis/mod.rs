@@ -1,4 +1,4 @@
-use redis::{Connection, ConnectionLike as _, FromRedisValue, RedisError, Value};
+use redis::{Cmd, Connection, ConnectionLike as _, FromRedisValue, RedisError, Value};
 
 use super::{fetcher::{FetchResult, Fetcher, FetcherError}, query_builder::QueryElement};
 
@@ -28,8 +28,12 @@ impl Fetcher for RedisFetcher {
         match request.query.first() {
             Some(query) => match query {
                 QueryElement::RawQuery(query) => {
-                    let packed_query = redis::cmd(&query).get_packed_command();
-                    let res = connection.req_packed_command(&packed_query)?;
+                    let mut cmd = Cmd::new();
+                    let args: Vec<&str> = query.split(' ').collect();
+                    cmd.arg(args);
+
+                    let res = cmd.query(&mut connection)?;
+
                     Ok(FetchResult::from_redis_value(&res)?)
                 },
                 QueryElement::ListAllItemsFrom(index) => {

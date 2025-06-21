@@ -32,9 +32,9 @@ where
 
             let pipe = Arc::new(Mutex::new(Pipe::new()));
             let db_objects_widget = DbObjectsWidget::new(fetcher_arc.clone(), pipe.clone());
-            let query_line_widget = QueryLineWidget::new(pipe.clone());
+            let query_line_widget = QueryLineWidget::new(fetcher_arc.clone(), pipe.clone());
             let query_result_widget = QueryResultWidget::new(pipe.clone());
-            let user_mode_widget = UserModeWidget::new();
+            let user_mode_widget = UserModeWidget::new(pipe.clone());
 
             let widgets: Vec<(Rect, Box<dyn Widget<TerminalBackend>>, usize)> = vec![
                 (units_list, Box::new(db_objects_widget), 0),

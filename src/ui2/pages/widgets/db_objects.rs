@@ -1,7 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{layout::Rect, prelude::Backend, style::{Color, Style}, text::Text, widgets::{Block, Borders, List}, Frame, Terminal};
+use ratatui::{crossterm::event::{KeyCode, KeyEvent}, layout::Rect, prelude::Backend, style::{Color, Style}, text::Text, widgets::{Block, Borders, List}, Frame, Terminal};
 
 use crate::{dbclient::{fetcher::{FetchRequest, Fetcher}, query_builder::QueryElement}, ui2::{pipe::{Payload, Pipe}, ui_mode::UserMode, Widget}};
 
@@ -34,7 +33,7 @@ where
     Client: Fetcher,
     TerminalBackend: Backend,
 {
-    fn render(&mut self, frame: &mut Frame, rect: &Rect, user_mode: &UserMode, is_selected: bool) {
+    fn render(&mut self, frame: &mut Frame, rect: &Rect, _: &UserMode, is_selected: bool) {
         use ratatui::widgets::ListState;
 
         let style = if is_selected {
@@ -79,7 +78,7 @@ where
         frame.render_stateful_widget(list, *rect, &mut list_state);
     }
 
-    fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent, user_mode: &UserMode) -> crate::ui2::WidgetReaction {
+    fn react_on_event(&mut self, _: &mut Terminal<TerminalBackend>, event: crate::ui2::UiEvent, _: &UserMode) -> crate::ui2::WidgetReaction {
         match event {
             crate::ui2::UiEvent::KeyboardEvent(key_event) => {
                 match key_event {

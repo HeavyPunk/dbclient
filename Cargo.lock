@@ -258,6 +258,7 @@ dependencies = [
  "ratatui",
  "redis",
  "serde",
+ "string_cmd",
  "toml",
 ]
 
@@ -834,6 +835,15 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "string_cmd"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4dbab93098184e9beec45fa0a9b006019868ee3067b2f8ead3b25aaf15c89e6"
+dependencies = [
+ "crossterm 0.28.1",
+]
 
 [[package]]
 name = "strsim"

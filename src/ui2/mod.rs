@@ -1,6 +1,5 @@
-use crossterm::event::{self, KeyCode, KeyEvent};
 use pages::main::MainPage;
-use ratatui::{layout::Rect, prelude::Backend, Frame, Terminal};
+use ratatui::{crossterm::event::{self, KeyCode, KeyEvent}, layout::Rect, prelude::Backend, Frame, Terminal};
 use ui_mode::UserMode;
 
 use crate::config::Config;
@@ -8,6 +7,7 @@ use crate::config::Config;
 pub mod pages;
 pub mod pipe;
 pub mod ui_mode;
+pub mod editor;
 
 pub enum UiEvent {
     KeyboardEvent(KeyEvent),
@@ -15,6 +15,7 @@ pub enum UiEvent {
 
 pub enum WidgetReaction {
     ExitFromWidget,
+    WrittenCmd(String),
     Nothing,
 }
 
@@ -33,6 +34,7 @@ where
     pub widgets: Vec<(Rect, Box<dyn Widget<TerminalBackend>>, usize)>,
     pub selected_widget_index: Option<usize>,
     pub select_widget_index: usize,
+    pub old_user_mode: UserMode,
     pub user_mode: UserMode,
     pub search_string: String,
 }
@@ -46,9 +48,15 @@ where
             widgets,
             selected_widget_index: None,
             select_widget_index: 0,
+            old_user_mode: UserMode::Normal,
             user_mode: UserMode::Normal,
             search_string: "".to_string(),
         }
+    }
+
+    fn update_user_mode(&mut self, mode: UserMode) {
+        self.old_user_mode = self.user_mode.clone();
+        self.user_mode = mode;
     }
 
     pub fn rerender(&mut self, frame: &mut Frame) {
@@ -108,7 +116,10 @@ where
                                     };
                                 },
                                 (KeyEvent { code: KeyCode::Char('i'), modifiers: _, kind: _, state: _ }, Some(_)) => {
-                                    self.user_mode = UserMode::Insert;
+                                    self.update_user_mode(UserMode::Insert);
+                                },
+                                (KeyEvent { code: KeyCode::Char(':'), modifiers: _, kind: _, state: _ }, Some(_)) => {
+                                    self.update_user_mode(UserMode::Command);
                                 },
                                 (KeyEvent { code: KeyCode::Enter, modifiers: _, kind: _, state: _ }, None) => {
                                     self.selected_widget_index = Some(self.select_widget_index);
@@ -125,32 +136,40 @@ where
                         },
                         UserMode::Insert => {
                             match key_event {
-                                KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => self.user_mode = UserMode::Normal,
+                                KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => self.update_user_mode(UserMode::Normal),
                                 _ => ()
                             };
                         },
                         UserMode::SearchInput => {
                             match key_event {
                                 KeyEvent { code: KeyCode::Char(ch), modifiers: _, kind: _, state: _ } => self.search_string.push(ch),
-                                KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => self.user_mode = UserMode::Normal,
-                                KeyEvent { code: KeyCode::Enter, modifiers: _, kind: _, state: _ } => self.user_mode = UserMode::Search(self.search_string.clone(), 0),
+                                KeyEvent { code: KeyCode::Esc, modifiers: _, kind: _, state: _ } => self.update_user_mode(UserMode::Normal),
+                                KeyEvent { code: KeyCode::Enter, modifiers: _, kind: _, state: _ } => self.update_user_mode(UserMode::Search(self.search_string.clone(), 0)),
                                 _ => ()
                             };
                         },
                         UserMode::Search(search, num) => {
                             match key_event {
                                 KeyEvent { code: KeyCode::Enter, modifiers: _, kind: _, state: _ } => (),
-                                KeyEvent { code: KeyCode::Char('n'), modifiers: _, kind: _, state: _ } => self.user_mode = UserMode::Search(search.clone(), num + 1),
-                                KeyEvent { code: KeyCode::Char('N'), modifiers: _, kind: _, state: _ } => self.user_mode = UserMode::Search(search.clone(), if *num > 0usize { num - 1} else { *num }),
+                                KeyEvent { code: KeyCode::Char('n'), modifiers: _, kind: _, state: _ } => self.update_user_mode(UserMode::Search(search.clone(), num + 1)),
+                                KeyEvent { code: KeyCode::Char('N'), modifiers: _, kind: _, state: _ } => self.update_user_mode(UserMode::Search(search.clone(), if *num > 0usize { num - 1} else { *num })),
                                 _ => ()
                             };
                         },
+                        UserMode::Command => {
+                            match key_event {
+                                KeyEvent { code: KeyCode::Enter, modifiers: _, kind: _, state: _ } => self.update_user_mode(UserMode::Normal),
+                                _ => (),
+
+                            }
+                        }
                     };
 
                     match self.selected_widget_index {
                         Some(selected_widget_index) => {
                             match self.widgets[selected_widget_index].1.react_on_event(terminal, UiEvent::KeyboardEvent(key_event), &self.user_mode) {
                                 WidgetReaction::ExitFromWidget => self.selected_widget_index = None,
+                                WidgetReaction::WrittenCmd(_) => self.user_mode = UserMode::Command,
                                 WidgetReaction::Nothing => (),
                             };
                         },
