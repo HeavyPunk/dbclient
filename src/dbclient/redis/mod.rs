@@ -110,7 +110,7 @@ fn get_index_type(index: &String, mut connection: &mut Connection) -> Result<Red
     let type_res = type_cmd.query::<FetchResult>(&mut connection)?;
     match type_res.table {
         Some(table) => {
-            match table.iter().last() {
+            match table.1.iter().last() {
                 Some((_, column)) => match column.first() {
                     Some(val) => match val.as_str() {
                         "string" => Ok(RedisType::String),

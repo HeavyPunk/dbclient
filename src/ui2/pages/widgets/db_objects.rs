@@ -47,7 +47,7 @@ where
 
             let list = match fetcher.fetch_db_objects() {
                 Ok(res) => match &res.table {
-                    Some(rows) => match rows.iter().last() {
+                    Some(rows) => match rows.1.iter().last() {
                         Some((_, vals)) => vals.to_vec(),
                         None => vec![],
                     },

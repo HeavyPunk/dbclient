@@ -40,13 +40,13 @@ where
         let rows = match &self.list {
             Some(r) => match &r.table {
                 Some(table) => {
-                    let headers: Vec<String> = table.keys().cloned().collect();
+                    let headers: Vec<String> = table.1.keys().cloned().collect();
                     let mut data_rows: Vec<Row> = vec![];
 
-                    let max_len = table.values().map(|v| v.len()).max().unwrap_or(0);
+                    let max_len = table.1.values().map(|v| v.len()).max().unwrap_or(0);
                     for row_index in 0..max_len {
                         let mut row_data: Vec<Cell> = vec![];
-                        for (column_index, column) in table.values().enumerate() {
+                        for (column_index, column) in table.1.values().enumerate() {
                             let style = if self.selected_cell_index.0 == column_index && self.selected_cell_index.1 == row_index {
                                 Style::default().bg(Color::Yellow).fg(Color::Black)
                             } else {

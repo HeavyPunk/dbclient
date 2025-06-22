@@ -18,8 +18,9 @@ fn test_int() {
     });
 
     let mut expected = HashMap::new();
-    expected.insert("result".to_string(), vec!["49".to_string()]);
-    assert_eq!(result, Ok(FetchResult{ table: Some(expected) }))
+    let index_key = "result".to_string();
+    expected.insert(index_key.clone(), vec!["49".to_string()]);
+    assert_eq!(result, Ok(FetchResult{ table: Some((vec![index_key], expected)) }))
 }
 
 #[test]
@@ -37,8 +38,9 @@ fn test_string() {
     });
 
     let mut expected = HashMap::new();
-    expected.insert("result".to_string(), vec!["nosql".to_string(), "redis".to_string(), "python".to_string()]);
-    assert_eq!(result, Ok(FetchResult{ table: Some(expected) }))
+    let index_key = "result".to_string();
+    expected.insert(index_key.clone(), vec!["nosql".to_string(), "redis".to_string(), "python".to_string()]);
+    assert_eq!(result, Ok(FetchResult{ table: Some((vec![index_key], expected)) }))
 }
 
 #[test]
@@ -56,6 +58,7 @@ fn test_hash() {
     });
 
     let mut expected = HashMap::new();
-    expected.insert("result".to_string(), vec!["nosql".to_string(), "redis".to_string(), "python".to_string()]);
-    assert_eq!(result, Ok(FetchResult{ table: Some(expected) }))
+    let index_key = "result".to_string();
+    expected.insert(index_key.clone(), vec!["nosql".to_string(), "redis".to_string(), "python".to_string()]);
+    assert_eq!(result, Ok(FetchResult{ table: Some((vec![index_key], expected)) }))
 }

@@ -9,22 +9,23 @@ pub(crate) mod fetcher {
 
     use super::query_builder::QueryElement;
 
+    type IndexColumn = String;
 
     #[derive(Debug, PartialEq)]
     pub struct FetchResult {
-        pub table: Option<HashMap<String, Vec<String>>>,
+        pub table: Option<(Vec<IndexColumn>, HashMap<String, Vec<String>>)>,
     }
 
     impl FetchResult {
         pub fn get_table_height(&self) -> usize {
             match &self.table {
-                Some(table) => table.values().map(|v| v.len()).max().unwrap_or(0),
+                Some(table) => table.1.values().map(|v| v.len()).max().unwrap_or(0),
                 None => 0,
             }
         }
         pub fn get_table_width(&self) -> usize {
             match &self.table {
-                Some(table) => table.keys().len(),
+                Some(table) => table.1.keys().len(),
                 None => 0,
             }
         }
@@ -65,26 +66,29 @@ pub(crate) mod fetcher {
 
         pub fn single<T>(item: &T) -> FetchResult where T: ToString {
             let mut table = HashMap::new();
-            table.insert("result".to_string(), vec![item.to_string()]);
+            let index_column = "result".to_string();
+            table.insert(index_column.clone(), vec![item.to_string()]);
 
             FetchResult {
-                table: Some(table),
+                table: Some((vec![index_column], table)),
             }
         }
 
         pub fn multiple<T>(items: &Vec<T>) -> FetchResult where T: ToString {
             let mut table = HashMap::new();
-            table.insert("result".to_string(), items.iter().map(|item| item.to_string()).collect());
-            FetchResult { table: Some(table) }
+            let index_column = "result".to_string();
+            table.insert(index_column.clone(), items.iter().map(|item| item.to_string()).collect());
+            FetchResult { table: Some((vec![index_column], table)) }
         }
 
         pub fn key_value(items: HashMap<String, String>) -> FetchResult {
             let keys: Vec<String> = items.keys().cloned().collect();
             let values: Vec<String> = items.values().cloned().collect();
             let mut table = HashMap::new();
-            table.insert("keys".to_string(), keys);
+            let index_column = "keys".to_string();
+            table.insert(index_column.clone(), keys);
             table.insert("values".to_string(), values);
-            FetchResult { table: Some(table) }
+            FetchResult { table: Some((vec![index_column], table)) }
         }
 
         pub fn merge(result1: &FetchResult, result2: &FetchResult) -> FetchResult {
@@ -94,8 +98,8 @@ pub(crate) mod fetcher {
                 (Some(t), None) => Some(t),
                 (Some(t1), Some(t2)) => {
                     let mut merged_table = t1.clone();
-                    for (key, value) in t2 {
-                        merged_table.entry(key).or_insert_with(Vec::new).extend(value);
+                    for (key, value) in t2.1 {
+                        merged_table.1.entry(key).or_insert_with(Vec::new).extend(value);
                     }
                     Some(merged_table)
                 },
@@ -106,17 +110,19 @@ pub(crate) mod fetcher {
         pub fn join(result1: &FetchResult, result2: &FetchResult) -> FetchResult {
             let table = match (&result1.table, &result2.table) {
                 (None, None) => None,
-                (None, Some(t)) => Some(t.clone()),
-                (Some(t), None) => Some(t.clone()),
+                (None, Some(t)) => Some((t.0.clone(), t.1.clone())),
+                (Some(t), None) => Some((t.0.clone(), t.1.clone())),
                 (Some(t1), Some(t2)) => {
                     let mut merged_table: HashMap<String, Vec<String>> = HashMap::new();
-                    for (key, value) in t1 {
+                    let mut index_keys = t1.0.clone();
+                    index_keys.extend(t2.0.clone());
+                    for (key, value) in &t1.1 {
                         merged_table.insert(format!("{}_1", key).to_string(), value.to_vec());
                     }
-                    for (key, value) in t2 {
+                    for (key, value) in &t2.1 {
                         merged_table.insert(format!("{}_2", key).to_string(), value.to_vec());
                     }
-                    Some(merged_table)
+                    Some((index_keys, merged_table))
                 },
             };
             FetchResult { table: table }
