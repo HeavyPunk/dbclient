@@ -22,6 +22,12 @@ pub(crate) mod fetcher {
                 None => 0,
             }
         }
+        pub fn get_table_width(&self) -> usize {
+            match &self.table {
+                Some(table) => table.keys().len(),
+                None => 0,
+            }
+        }
     }
 
     #[derive(Debug, PartialEq, Clone)]
@@ -72,6 +78,15 @@ pub(crate) mod fetcher {
             FetchResult { table: Some(table) }
         }
 
+        pub fn key_value(items: HashMap<String, String>) -> FetchResult {
+            let keys: Vec<String> = items.keys().cloned().collect();
+            let values: Vec<String> = items.values().cloned().collect();
+            let mut table = HashMap::new();
+            table.insert("keys".to_string(), keys);
+            table.insert("values".to_string(), values);
+            FetchResult { table: Some(table) }
+        }
+
         pub fn merge(result1: &FetchResult, result2: &FetchResult) -> FetchResult {
             let table = match (result1.table.clone(), result2.table.clone()) {
                 (None, None) => None,
@@ -86,6 +101,25 @@ pub(crate) mod fetcher {
                 },
             };
             FetchResult { table }
+        }
+
+        pub fn join(result1: &FetchResult, result2: &FetchResult) -> FetchResult {
+            let table = match (&result1.table, &result2.table) {
+                (None, None) => None,
+                (None, Some(t)) => Some(t.clone()),
+                (Some(t), None) => Some(t.clone()),
+                (Some(t1), Some(t2)) => {
+                    let mut merged_table: HashMap<String, Vec<String>> = HashMap::new();
+                    for (key, value) in t1 {
+                        merged_table.insert(format!("{}_1", key).to_string(), value.to_vec());
+                    }
+                    for (key, value) in t2 {
+                        merged_table.insert(format!("{}_2", key).to_string(), value.to_vec());
+                    }
+                    Some(merged_table)
+                },
+            };
+            FetchResult { table: table }
         }
     }
 }

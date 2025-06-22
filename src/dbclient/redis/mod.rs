@@ -1,4 +1,6 @@
-use redis::{Cmd, Connection, ConnectionLike as _, FromRedisValue, RedisError, Value};
+use std::collections::HashMap;
+
+use redis::{Cmd, Commands, Connection, ConnectionLike as _, FromRedisValue, RedisError, Value};
 
 use super::{fetcher::{FetchResult, Fetcher, FetcherError}, query_builder::QueryElement};
 
@@ -39,16 +41,36 @@ impl Fetcher for RedisFetcher {
                 QueryElement::ListAllItemsFrom(index) => {
                     let index_type = get_index_type(index, &mut connection)?;
                     let res = match index_type {
-                        RedisType::String => connection.req_command(&redis::cmd("GET").arg(index))?,
-                        RedisType::List => connection.req_command(&redis::cmd("LRANGE").arg(index).arg(0).arg(-1))?,
-                        RedisType::Set => connection.req_command(&redis::cmd("SMEMBERS").arg(index))?,
-                        RedisType::Zset => connection.req_command(&redis::cmd("ZRANGE").arg(index).arg(0).arg(-1))?,
-                        RedisType::Hash => connection.req_command(&redis::cmd("HGETALL").arg(index))?,
-                        RedisType::Stream => connection.req_command(&redis::cmd("XRANGE").arg(index).arg("-").arg("+"))?,
-                        RedisType::None => Value::Nil,
+                        RedisType::String => {
+                            let res: String = connection.get(index)?;
+                            FetchResult::single(&res)
+                        },
+                        RedisType::List => {
+                            let res: Vec<String> = connection.lrange(index, 0, -1)?;
+                            FetchResult::multiple(&res)
+                        },
+                        RedisType::Set => {
+                            let res: Vec<String> = connection.smembers(index)?;
+                            FetchResult::multiple(&res)
+                        },
+                        RedisType::Zset => {
+                            let res: Vec<String> = connection.zrange(index, 0, -1)?;
+                            FetchResult::multiple(&res)
+                        },
+                        RedisType::Hash => {
+                            let res: HashMap<String, String> = connection.hgetall(index)?;
+                            FetchResult::key_value(res)
+                        },
+                        RedisType::Stream => {
+                            FetchResult::none()
+                        },
+                        RedisType::None => {
+                            FetchResult::none()
+                        },
                     };
                     
-                    Ok(FetchResult::from_redis_value(&res)?)
+                    // Ok(FetchResult::from_redis_value(&res)?)
+                    Ok(res)
                 },
             },
             None => Err(FetcherError::InvalidQuery),
@@ -133,8 +155,8 @@ impl FromRedisValue for FetchResult {
                 for item in items {
                     let pre_res1 = FetchResult::from_redis_value(&item.0)?;
                     let pre_res2 = FetchResult::from_redis_value(&item.1)?;
-                    res = FetchResult::merge(&res, &pre_res1);
-                    res = FetchResult::merge(&res, &pre_res2);
+                    res = FetchResult::join(&res, &pre_res1);
+                    res = FetchResult::join(&res, &pre_res2);
                 }
                 Ok(res)
             },
