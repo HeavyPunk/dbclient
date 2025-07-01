@@ -7,7 +7,7 @@
         {
             "name": "Debug",
             "type": "gdb",
-            "args": ["--config", "${workspaceFolder}/tests.config.toml"],
+            "args": ["--config-path", "${workspaceFolder}/tests.config.toml"],
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/target/debug/dbclient"
@@ -18,7 +18,8 @@
             "request": "attach",
             "pid": "${command:pickProcess}",
             "program": "${workspaceFolder}/target/debug/dbclient",
-            "mode": "debug"
+            "mode": "debug",
+            "stopOnEntry": false
         }
     ]
 }

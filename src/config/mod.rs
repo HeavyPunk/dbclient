@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use std::fmt;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd, Clone, Eq)]
 pub enum ConnectionType {
     Redis,
     Postgres,
@@ -20,7 +20,7 @@ impl fmt::Display for ConnectionType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd, Clone, Eq)]
 pub struct Connection {
     pub connection_type: ConnectionType,
     pub name: String,
