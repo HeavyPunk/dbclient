@@ -11,7 +11,7 @@ pub(crate) mod fetcher {
 
     type IndexColumn = String;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Clone)]
     pub struct FetchResult {
         pub table: Option<(Vec<IndexColumn>, HashMap<String, Vec<String>>)>,
     }
@@ -36,7 +36,7 @@ pub(crate) mod fetcher {
         pub columns: Vec<String>
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Clone)]
     pub struct FetchRequest {
         pub query: Vec<QueryElement>,
         pub limit: usize,

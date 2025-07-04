@@ -1,20 +1,20 @@
-use crate::config::Connection;
+use crate::dbclient::fetcher::{FetchRequest, FetchResult};
 
 pub mod model;
 pub mod connections_list;
 pub mod db_objects;
+pub mod query_result;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Msg {
     AppClose,
-    ToQueryPage,
+    ToQueryPage(usize),
     ToConnectionsPage,
-    ConnectionSelected(usize),
-    SelectPrevConnection,
-    SelectNextConnection,
-    SelectNextDbObject,
-    SelectPrevDbObject,
     FetchDbObjects,
+    FetchDbObject(String),
+    ExecuteQuery(FetchRequest),
+    ToQueryResultWidget,
+    ToDbObjectsWidget,
     None,
 }
 

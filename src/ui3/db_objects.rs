@@ -34,8 +34,27 @@ impl Component<Msg, AppEvent> for DbObjects {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
             Event::Keyboard(KeyEvent { code: Key::Char('r'), .. }) => Some(Msg::FetchDbObjects),
-            Event::Keyboard(KeyEvent { code: Key::Char('j'), .. }) => Some(Msg::SelectNextDbObject),
-            Event::Keyboard(KeyEvent { code: Key::Char('k'), .. }) => Some(Msg::SelectPrevDbObject),
+            Event::Keyboard(KeyEvent { code: Key::Char('j'), .. }) => {
+                self.component.states.incr_list_index(true);
+                Some(Msg::None)
+            },
+            Event::Keyboard(KeyEvent { code: Key::Char('k'), .. }) => {
+                self.component.states.decr_list_index(true);
+                Some(Msg::None)
+            },
+            Event::Keyboard(KeyEvent { code: Key::Char('L'), ..}) => Some(Msg::ToQueryResultWidget),
+            Event::Keyboard(KeyEvent { code: Key::Enter, .. }) => {
+                match self.component.query(Attribute::Content) {
+                    Some(val) => match val {
+                        AttrValue::Table(list) => {
+                            let current_object = list.get(self.component.states.list_index).unwrap().get(0).unwrap();
+                            Some(Msg::FetchDbObject(current_object.content.clone()))
+                        },
+                        _ => Some(Msg::None)
+                    },
+                    None => Some(Msg::None),
+                }
+            },
             _ => Some(Msg::None)
         }
     }

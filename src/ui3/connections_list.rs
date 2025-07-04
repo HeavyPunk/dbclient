@@ -1,6 +1,5 @@
 use ratatui::{layout::Alignment, style::Color};
-use tui_realm_stdlib::List;
-use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, TableBuilder, TextSpan}, AttrValue, Attribute, Component, Event, MockComponent};
+use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, TableBuilder, TextSpan}, Component, Event, MockComponent};
 
 use crate::config::Connection;
 
@@ -32,11 +31,19 @@ impl Default for ConnectionsListComponent {
 impl Component<Msg, AppEvent> for ConnectionsListComponent {
     fn on(&mut self, ev: tuirealm::Event<AppEvent>) -> Option<Msg> {
         match ev {
-            Event::Keyboard(KeyEvent { code: Key::Tab, .. }) => Some(Msg::ToQueryPage),
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::AppClose),
-            Event::Keyboard(KeyEvent { code: Key::Char('j'), .. }) => Some(Msg::SelectNextConnection),
-            Event::Keyboard(KeyEvent { code: Key::Char('k'), .. }) => Some(Msg::SelectPrevConnection),
-            Event::Keyboard(KeyEvent { code: Key::Enter, .. }) => Some(Msg::ToQueryPage),
+            Event::Keyboard(KeyEvent { code: Key::Char('j'), .. }) => {
+                self.component.states.incr_list_index(true);
+                Some(Msg::None)
+            },
+            Event::Keyboard(KeyEvent { code: Key::Char('k'), .. }) => {
+                self.component.states.decr_list_index(true);
+                Some(Msg::None)
+            },
+            Event::Keyboard(KeyEvent { code: Key::Enter, .. }) => {
+                let selected_connection = self.component.states.list_index;
+                Some(Msg::ToQueryPage(selected_connection))
+            },
             _ => Some(Msg::None),
         }
     }

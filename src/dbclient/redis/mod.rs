@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use redis::{Cmd, Commands, Connection, ConnectionLike as _, FromRedisValue, RedisError, Value};
+use redis::{Cmd, Commands, Connection, FromRedisValue, RedisError};
 
 use super::{fetcher::{FetchResult, Fetcher, FetcherError}, query_builder::QueryElement};
 

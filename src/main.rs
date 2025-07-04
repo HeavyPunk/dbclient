@@ -1,5 +1,3 @@
-use std::{thread, time::Duration};
-
 use clap::Parser;
 use cli::Cli;
 use config::Config;
