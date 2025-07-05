@@ -4,6 +4,7 @@ pub mod model;
 pub mod connections_list;
 pub mod db_objects;
 pub mod query_result;
+pub mod query_input;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Msg {
@@ -12,9 +13,11 @@ pub enum Msg {
     ToConnectionsPage,
     FetchDbObjects,
     FetchDbObject(String),
+    ExecuteCustomQuery(String),
     ExecuteQuery(FetchRequest),
     ToQueryResultWidget,
     ToDbObjectsWidget,
+    ToQueryInputWidget,
     None,
 }
 

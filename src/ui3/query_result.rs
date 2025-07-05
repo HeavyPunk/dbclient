@@ -35,6 +35,7 @@ impl Component<Msg, AppEvent> for QueryResult {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
             Event::Keyboard(KeyEvent { code: Key::Char('H'), ..}) => Some(Msg::ToDbObjectsWidget),
+            Event::Keyboard(KeyEvent { code: Key::Char('K'), ..}) => Some(Msg::ToQueryInputWidget),
             Event::Keyboard(KeyEvent { code: Key::Char('j'), ..}) => {
                 self.component.states.incr_list_index(true);
                 Some(Msg::None)

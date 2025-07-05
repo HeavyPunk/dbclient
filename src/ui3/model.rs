@@ -1,7 +1,7 @@
-use std::{time::Duration, usize};
+use std::{default, time::Duration, usize};
 use ratatui::layout::{Constraint, Direction};
 use tuirealm::{props::Layout, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
-use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_result::QueryResult}};
+use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_input::QueryInput, query_result::QueryResult}};
 
 use super::{AppEvent, Id, Msg, Page};
 
@@ -41,6 +41,7 @@ impl Model<CrosstermTerminalAdapter> {
         assert!(app.mount(Id::ConnectionsList, Box::<ConnectionsListComponent>::default(), vec![]).is_ok());
         assert!(app.mount(Id::DbObjects, Box::<DbObjects>::default(), vec![]).is_ok());
         assert!(app.mount(Id::QueryResult, Box::<QueryResult>::default(), vec![]).is_ok());
+        assert!(app.mount(Id::QueryLine, Box::<QueryInput>::default(), vec![]).is_ok());
 
         assert!(app.active(&Id::ConnectionsList).is_ok());
 
@@ -91,8 +92,16 @@ impl Model<CrosstermTerminalAdapter> {
                                     Constraint::Fill(4),
                                 ].as_ref(),
                             ).chunks(f.area());
+                        let query_chunks = Layout::default()
+                            .direction(Direction::Vertical)
+                            .constraints(&[
+                                Constraint::Max(3),
+                                Constraint::Fill(1),
+                            ])
+                            .chunks(chunks[1]);
                         self.app.view(&Id::DbObjects, f, chunks[0]);
-                        self.app.view(&Id::QueryResult, f, chunks[1]);
+                        self.app.view(&Id::QueryResult, f, query_chunks[1]);
+                        self.app.view(&Id::QueryLine, f, query_chunks[0]);
                     }).is_ok()
                 );
                 assert!(self.app.active(&self.query_page_selected_widget).is_ok());
@@ -157,6 +166,14 @@ impl Model<CrosstermTerminalAdapter> {
         return Some(Msg::ExecuteQuery(query));
     }
 
+    fn execute_custom_query(&mut self, query: String) -> Option<Msg> {
+        let query = FetchRequest {
+            query: vec![QueryElement::RawQuery(query)],
+            limit: usize::MAX
+        };
+        return Some(Msg::ExecuteQuery(query));
+    }
+
     fn reload_db_objects(&mut self) -> Option<Msg> {
         if let Some(ref mut fetcher) = self.fetcher {
             let result = fetcher.fetch_db_objects().unwrap();
@@ -216,6 +233,10 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                     self.fetch_db_object(object)
                 },
 
+                Msg::ExecuteCustomQuery(query) => {
+                    self.execute_custom_query(query)
+                },
+
                 Msg::ExecuteQuery(query) => {
                     self.reload_query_result(&query)
                 },
@@ -227,6 +248,10 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
 
                 Msg::ToQueryResultWidget => {
                     self.query_page_selected_widget = Id::QueryResult;
+                    None
+                },
+                Msg::ToQueryInputWidget => {
+                    self.query_page_selected_widget = Id::QueryLine;
                     None
                 }
 
