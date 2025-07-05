@@ -14,6 +14,10 @@ string_cmd = { version = "0.1.2", features = ["crossterm"] }
 tuirealm = { version = "3", default-features = false, features = [ "derive", "serialize", "crossterm" ] }
 tui-realm-stdlib = "3"
 
+# TODO: Check for https://github.com/veeso/tui-realm-textarea/pull/9 and replace
+# tui-realm-textarea = { version = "2", default-features = false, features = [ "clipboard" ] }
+tui-realm-textarea = { git = "https://github.com/g1ibby/tui-realm-textarea.git", rev = "32eb97cf8ee42b306cdb9fb01cb6a327256ec19f", default-features = false, features = [ "clipboard" ] }
+
 #db clients
 redis = { version = "0.31"}
 

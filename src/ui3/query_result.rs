@@ -61,17 +61,11 @@ impl QueryResult {
         for header in headers {
             table_builder.add_col(header);
         }
-        // table_builder.add_row();
 
         let max_len = table.1.values().map(|v| v.len()).max().unwrap_or(0);
         for row_index in 0..max_len {
             table_builder.add_row();
             for column in table.1.values() {
-                // let style = if self.selected_cell_index.0 == column_index && self.selected_cell_index.1 == row_index {
-                //     Style::default().bg(Color::Yellow).fg(Color::Black)
-                // } else {
-                //     Style::default()
-                // };
                 let val = column.get(row_index).cloned().unwrap_or_else(|| "".to_string());
                 table_builder.add_col(TextSpan::new(val));
             }

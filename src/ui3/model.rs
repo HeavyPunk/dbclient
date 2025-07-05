@@ -35,7 +35,7 @@ impl Model<CrosstermTerminalAdapter> {
             EventListenerCfg::default()
                 .crossterm_input_listener(Duration::from_millis(10), 3)
                 .poll_timeout(Duration::from_millis(20))
-                .tick_interval(Duration::from_secs(1))
+                .tick_interval(Duration::from_millis(300))
         );
 
         assert!(app.mount(Id::ConnectionsList, Box::<ConnectionsListComponent>::default(), vec![]).is_ok());
@@ -53,7 +53,7 @@ impl Model<CrosstermTerminalAdapter> {
             connections: config.connections.clone(),
             selected_page: Page::Connections,
             fetcher: None,
-            query_page_selected_widget: Id::DbObjects
+            query_page_selected_widget: Id::DbObjects,
         }
     }
 
@@ -75,7 +75,6 @@ impl Model<CrosstermTerminalAdapter> {
                         self.app.view(&Id::ConnectionsList, f, chunks[0]);
                     }).is_ok()
                 );
-                assert!(self.app.active(&Id::ConnectionsList).is_ok());
                 self.reload_connections();
             },
             Page::Query => {
@@ -95,7 +94,7 @@ impl Model<CrosstermTerminalAdapter> {
                         let query_chunks = Layout::default()
                             .direction(Direction::Vertical)
                             .constraints(&[
-                                Constraint::Max(3),
+                                Constraint::Max(10),
                                 Constraint::Fill(1),
                             ])
                             .chunks(chunks[1]);
@@ -104,7 +103,6 @@ impl Model<CrosstermTerminalAdapter> {
                         self.app.view(&Id::QueryLine, f, query_chunks[0]);
                     }).is_ok()
                 );
-                assert!(self.app.active(&self.query_page_selected_widget).is_ok());
             },
         };
     }
@@ -113,7 +111,6 @@ impl Model<CrosstermTerminalAdapter> {
         while !self.quit {
             match self.app.tick(PollStrategy::Once) {
                 Ok(messages) => {
-                    self.redraw = true;
                     messages.iter().map(Some).for_each(|msg| {
                         let mut msg = msg.cloned();
                         while msg.is_some() {
@@ -211,6 +208,7 @@ impl Model<CrosstermTerminalAdapter> {
 impl Update<Msg> for Model<CrosstermTerminalAdapter>
 {
     fn update(&mut self, msg: Option<Msg>) -> Option<Msg> {
+        self.redraw = true;
         if let Some(msg) = msg {
             self.redraw = true;
             match msg {
@@ -219,10 +217,13 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                     None
                 },
                 Msg::ToQueryPage(selected_connection) => {
-                    self.init_fetcher(selected_connection)
+                    let result = self.init_fetcher(selected_connection);
+                    assert!(self.app.active(&self.query_page_selected_widget).is_ok());
+                    result
                 },
                 Msg::ToConnectionsPage => {
                     self.selected_page = Page::Connections;
+                    assert!(self.app.active(&Id::ConnectionsList).is_ok());
                     None
                 },
                 Msg::FetchDbObjects => {
@@ -243,15 +244,18 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                 
                 Msg::ToDbObjectsWidget => {
                     self.query_page_selected_widget = Id::DbObjects;
+                    assert!(self.app.active(&Id::DbObjects).is_ok());
                     None
                 },
 
                 Msg::ToQueryResultWidget => {
                     self.query_page_selected_widget = Id::QueryResult;
+                    assert!(self.app.active(&Id::QueryResult).is_ok());
                     None
                 },
                 Msg::ToQueryInputWidget => {
                     self.query_page_selected_widget = Id::QueryLine;
+                    assert!(self.app.active(&Id::QueryLine).is_ok());
                     None
                 }
 
