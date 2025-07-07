@@ -17,7 +17,8 @@ pub enum Msg {
     ExecuteQuery(FetchRequest),
     ToQueryResultWidget,
     ToDbObjectsWidget,
-    ToQueryInputWidget,
+    ActivateEditor(WidgetKind),
+    DiactivateEditor,
     None,
 }
 
@@ -37,5 +38,11 @@ pub enum Id {
 pub enum Page {
     Connections,
     Query
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum WidgetKind {
+    Query,
+    Search
 }
 

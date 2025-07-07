@@ -1,7 +1,7 @@
-use std::{default, time::Duration, usize};
-use ratatui::layout::{Constraint, Direction};
+use std::{cmp::min, collections::HashMap, default, time::Duration, usize};
+use ratatui::layout::{Alignment, Constraint, Direction, Rect};
 use tuirealm::{props::Layout, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
-use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_input::QueryInput, query_result::QueryResult}};
+use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_input::QueryInput, query_result::QueryResult, WidgetKind}};
 
 use super::{AppEvent, Id, Msg, Page};
 
@@ -20,6 +20,7 @@ where
 
     pub fetcher: Option<Box<dyn Fetcher>>,
     pub query_page_selected_widget: Id,
+    pub show_editor: bool,
 }
 
 impl Model<CrosstermTerminalAdapter> {
@@ -41,7 +42,7 @@ impl Model<CrosstermTerminalAdapter> {
         assert!(app.mount(Id::ConnectionsList, Box::<ConnectionsListComponent>::default(), vec![]).is_ok());
         assert!(app.mount(Id::DbObjects, Box::<DbObjects>::default(), vec![]).is_ok());
         assert!(app.mount(Id::QueryResult, Box::<QueryResult>::default(), vec![]).is_ok());
-        assert!(app.mount(Id::QueryLine, Box::<QueryInput>::default(), vec![]).is_ok());
+        // assert!(app.mount(Id::QueryLine, Box::<QueryInput>::default(), vec![]).is_ok());
 
         assert!(app.active(&Id::ConnectionsList).is_ok());
 
@@ -54,6 +55,7 @@ impl Model<CrosstermTerminalAdapter> {
             selected_page: Page::Connections,
             fetcher: None,
             query_page_selected_widget: Id::DbObjects,
+            show_editor: false,
         }
     }
 
@@ -91,21 +93,25 @@ impl Model<CrosstermTerminalAdapter> {
                                     Constraint::Fill(4),
                                 ].as_ref(),
                             ).chunks(f.area());
-                        let query_chunks = Layout::default()
-                            .direction(Direction::Vertical)
-                            .constraints(&[
-                                Constraint::Max(10),
-                                Constraint::Fill(1),
-                            ])
-                            .chunks(chunks[1]);
                         self.app.view(&Id::DbObjects, f, chunks[0]);
-                        self.app.view(&Id::QueryResult, f, query_chunks[1]);
-                        self.app.view(&Id::QueryLine, f, query_chunks[0]);
+                        self.app.view(&Id::QueryResult, f, chunks[1]);
+                        if self.show_editor {
+                            self.app.view(&Id::QueryLine, f, Self::centered_rect(80, 10, f.area()));
+                        }
                     }).is_ok()
                 );
             },
         };
     }
+
+    fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
+        Rect {
+            x: area.width.saturating_sub(width) / 2,
+            y: area.height.saturating_sub(height) / 2,
+            width: min(width, area.width),
+            height: min(height, area.height),
+        }
+    } 
 
     pub fn main_loop(&mut self) {
         while !self.quit {
@@ -152,7 +158,7 @@ impl Model<CrosstermTerminalAdapter> {
                     AttrValue::Table(QueryResult::build_result_table(result))).is_ok()
             );
         }
-        Some(Msg::None)
+        Some(Msg::FetchDbObjects)
     }
 
     fn fetch_db_object(&mut self, object: String) -> Option<Msg> {
@@ -174,13 +180,13 @@ impl Model<CrosstermTerminalAdapter> {
     fn reload_db_objects(&mut self) -> Option<Msg> {
         if let Some(ref mut fetcher) = self.fetcher {
             let result = fetcher.fetch_db_objects().unwrap();
-            let result = result.table.unwrap();
-            let list = result.1.iter().last().unwrap();
+            let result = result.table.unwrap_or((vec![], HashMap::default()));
+            let list = result.1.iter().last();
             assert!(
                 self.app.attr(
                     &Id::DbObjects,
                     Attribute::Content,
-                    AttrValue::Table(DbObjects::build_objects_list(list.1))).is_ok()
+                    AttrValue::Table(DbObjects::build_objects_list(list.unwrap_or((&"".to_string(), &vec![])).1))).is_ok()
             );
         }
         Some(Msg::None)
@@ -253,9 +259,26 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                     assert!(self.app.active(&Id::QueryResult).is_ok());
                     None
                 },
-                Msg::ToQueryInputWidget => {
-                    self.query_page_selected_widget = Id::QueryLine;
+                Msg::ActivateEditor(widget_kind) => {
+                    self.show_editor = true;
+                    assert!(self.app.mount(Id::QueryLine, Box::<QueryInput>::default(), vec![]).is_ok());
+                    assert!(match widget_kind {
+                        WidgetKind::Query => {
+                            self.app.attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Query".to_string(), Alignment::Left)))
+                        },
+                        WidgetKind::Search => {
+                            self.app.attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Search".to_string(), Alignment::Left)))
+                        },
+                    }.is_ok());
                     assert!(self.app.active(&Id::QueryLine).is_ok());
+                    None
+                },
+                Msg::DiactivateEditor => {
+                    self.show_editor = false;
+                    assert!(self.app.active(&self.query_page_selected_widget).is_ok());
+                    if self.app.mounted(&Id::QueryLine) {
+                        assert!(self.app.umount(&Id::QueryLine).is_ok());
+                    }
                     None
                 }
 

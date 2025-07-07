@@ -3,7 +3,7 @@ use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, Table
 
 use crate::dbclient::fetcher::FetchResult;
 
-use super::{AppEvent, Msg};
+use super::{AppEvent, Msg, WidgetKind};
 
 #[derive(MockComponent)]
 pub struct QueryResult {
@@ -35,7 +35,7 @@ impl Component<Msg, AppEvent> for QueryResult {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
             Event::Keyboard(KeyEvent { code: Key::Char('H'), ..}) => Some(Msg::ToDbObjectsWidget),
-            Event::Keyboard(KeyEvent { code: Key::Char('K'), ..}) => Some(Msg::ToQueryInputWidget),
+            Event::Keyboard(KeyEvent { code: Key::Char('q'), ..}) => Some(Msg::ActivateEditor(WidgetKind::Query)),
             Event::Keyboard(KeyEvent { code: Key::Char('j'), ..}) => {
                 self.component.states.incr_list_index(true);
                 Some(Msg::None)
