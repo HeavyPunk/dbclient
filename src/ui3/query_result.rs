@@ -45,11 +45,11 @@ impl Component<Msg, AppEvent> for QueryResult {
                 Some(Msg::None)
             },
             Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(WidgetKind::Search)),
-            Event::Keyboard(KeyEvent { code: Key::Char('G'), .. }) => {
+            Event::Keyboard(KeyEvent { code: Key::Char('g'), .. }) => {
                 self.component.states.list_index_at_first();
                 Some(Msg::None)
             },
-            Event::Keyboard(KeyEvent { code: Key::Char('g'), .. }) => {
+            Event::Keyboard(KeyEvent { code: Key::Char('G'), .. }) => {
                 self.component.states.list_index_at_last();
                 Some(Msg::None)
             },
