@@ -2,6 +2,8 @@
 
 A universal Terminal User Interface (TUI) client for database management with Vim-like interactions.
 
+> **Warning:** This project is in the beginning stages of development and has an unstable API and workflow.
+
 ## Features
 
 ### Currently Supported
