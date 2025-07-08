@@ -19,5 +19,5 @@ tui-realm-stdlib = "3"
 tui-realm-textarea = { git = "https://github.com/g1ibby/tui-realm-textarea.git", rev = "32eb97cf8ee42b306cdb9fb01cb6a327256ec19f", default-features = false, features = [ "clipboard" ] }
 
 #db clients
-redis = { version = "0.31"}
+redis = { version = "0.31" }
 

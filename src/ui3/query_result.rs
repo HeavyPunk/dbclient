@@ -1,9 +1,9 @@
 use ratatui::{layout::Alignment, style::Color};
-use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, TableBuilder, TextSpan}, Component, Event, MockComponent};
+use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, TableBuilder, TextSpan}, AttrValue, Attribute, Component, Event, MockComponent};
 
 use crate::dbclient::fetcher::FetchResult;
 
-use super::{AppEvent, Msg, WidgetKind};
+use super::{AppEvent, Msg, WidgetKind, APP_SEARCH_PATTERN};
 
 #[derive(MockComponent)]
 pub struct QueryResult {
@@ -44,6 +44,59 @@ impl Component<Msg, AppEvent> for QueryResult {
                 self.component.states.decr_list_index(true);
                 Some(Msg::None)
             },
+            Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(WidgetKind::Search)),
+            Event::Keyboard(KeyEvent { code: Key::Char('G'), .. }) => {
+                self.component.states.list_index_at_first();
+                Some(Msg::None)
+            },
+            Event::Keyboard(KeyEvent { code: Key::Char('g'), .. }) => {
+                self.component.states.list_index_at_last();
+                Some(Msg::None)
+            },
+            Event::Keyboard(KeyEvent { code: Key::Char('n'), ..}) => {
+                self.query(Attribute::Custom(APP_SEARCH_PATTERN))
+                    .and_then(|val| match val {
+                        AttrValue::String(pattern) => {
+                            let current_table = self.get_current_table();
+
+                            let start_index = self.component.states.list_index;
+                            self.component.states.incr_list_index(true);
+                            'searcher: while self.component.states.list_index != start_index {
+                                let row = current_table.get(self.component.states.list_index).unwrap();
+                                for item in row {
+                                    if item.contains(&pattern) {
+                                        break 'searcher;
+                                    }
+                                }
+                                self.component.states.incr_list_index(true);
+                            }
+                            None
+                        },
+                        _ => None
+                    }).unwrap_or(Some(Msg::None))
+            },
+            Event::Keyboard(KeyEvent { code: Key::Char('N'), ..}) => {
+                self.query(Attribute::Custom(APP_SEARCH_PATTERN))
+                    .and_then(|val| match val {
+                        AttrValue::String(pattern) => {
+                            let current_table = self.get_current_table();
+
+                            let start_index = self.component.states.list_index;
+                            self.component.states.decr_list_index(true);
+                            'searcher: while self.component.states.list_index != start_index {
+                                let row = current_table.get(self.component.states.list_index).unwrap();
+                                for item in row {
+                                    if item.contains(&pattern) {
+                                        break 'searcher;
+                                    }
+                                }
+                                self.component.states.decr_list_index(true);
+                            }
+                            None
+                        },
+                        _ => None
+                    }).unwrap_or(Some(Msg::None))
+            }
             _ => Some(Msg::None)
         }
     }
@@ -71,6 +124,18 @@ impl QueryResult {
             }
         }
         table_builder.build()
+    }
+
+    pub fn get_current_table(&self) -> Vec<Vec<String>> {
+        self.component.query(Attribute::Content).and_then(|val| {
+            match val {
+                AttrValue::Table(table) => {
+                    let result: Vec<Vec<String>> = table.iter().map(|row| row.iter().map(|elem| elem.content.clone()).collect()).collect();
+                    Some(result)
+                },
+                _ => None
+            }
+        }).unwrap_or(vec![])
     }
 }
 
