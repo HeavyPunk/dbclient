@@ -1,9 +1,9 @@
 use std::{cmp::min, collections::HashMap, default, time::Duration, usize};
 use ratatui::layout::{Alignment, Constraint, Direction, Rect};
-use tuirealm::{props::Layout, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
-use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_input::QueryInput, query_result::QueryResult, WidgetKind}};
+use tuirealm::{props::{Layout, PropPayload, PropValue}, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
+use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_input::QueryInput, query_result::QueryResult, WidgetKind, INPUT_POPUP_WIDGET_KIND}};
 
-use super::{AppEvent, Id, Msg, Page};
+use super::{AppEvent, Id, Msg, Page, APP_SEARCH_PATTERN};
 
 
 pub struct Model<TermAdapter>
@@ -177,6 +177,27 @@ impl Model<CrosstermTerminalAdapter> {
         return Some(Msg::ExecuteQuery(query));
     }
 
+    fn search_pattern(&mut self, pattern: String) -> Option<Msg> {
+        match self.query_page_selected_widget {
+            Id::ConnectionsList => {
+                assert!(self.app.attr(&Id::ConnectionsList, Attribute::Custom(APP_SEARCH_PATTERN), AttrValue::String(pattern)).is_ok());
+                Some(Msg::None)
+            },
+            Id::DbObjects => {
+                assert!(self.app.attr(&Id::DbObjects, Attribute::Custom(APP_SEARCH_PATTERN), AttrValue::String(pattern)).is_ok());
+                Some(Msg::None)
+            },
+            Id::QueryLine => {
+                assert!(self.app.attr(&Id::QueryLine, Attribute::Custom(APP_SEARCH_PATTERN), AttrValue::String(pattern)).is_ok());
+                Some(Msg::None)
+            },
+            Id::QueryResult => {
+                assert!(self.app.attr(&Id::QueryResult, Attribute::Custom(APP_SEARCH_PATTERN), AttrValue::String(pattern)).is_ok());
+                Some(Msg::None)
+            },
+        }
+    }
+
     fn reload_db_objects(&mut self) -> Option<Msg> {
         if let Some(ref mut fetcher) = self.fetcher {
             let result = fetcher.fetch_db_objects().unwrap();
@@ -244,6 +265,10 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                     self.execute_custom_query(query)
                 },
 
+                Msg::SearchPattern(pattern) => {
+                    self.search_pattern(pattern)
+                }
+
                 Msg::ExecuteQuery(query) => {
                     self.reload_query_result(&query)
                 },
@@ -264,10 +289,16 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                     assert!(self.app.mount(Id::QueryLine, Box::<QueryInput>::default(), vec![]).is_ok());
                     assert!(match widget_kind {
                         WidgetKind::Query => {
-                            self.app.attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Query".to_string(), Alignment::Left)))
+                            self.app
+                                .attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Query".to_string(), Alignment::Left)))
+                                .and(self.app
+                                    .attr(&Id::QueryLine, Attribute::Custom(INPUT_POPUP_WIDGET_KIND), AttrValue::Payload(PropPayload::One(PropValue::U8(widget_kind.into())))))
                         },
                         WidgetKind::Search => {
-                            self.app.attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Search".to_string(), Alignment::Left)))
+                            self.app
+                                .attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Search".to_string(), Alignment::Left)))
+                                .and(self.app
+                                    .attr(&Id::QueryLine, Attribute::Custom(INPUT_POPUP_WIDGET_KIND), AttrValue::Payload(PropPayload::One(PropValue::U8(widget_kind.into())))))
                         },
                     }.is_ok());
                     assert!(self.app.active(&Id::QueryLine).is_ok());
@@ -280,7 +311,20 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                         assert!(self.app.umount(&Id::QueryLine).is_ok());
                     }
                     None
-                }
+                },
+
+                Msg::EditorResult(widget_kind, res) => {
+                    match widget_kind {
+                        WidgetKind::Query => {
+                            let query = res.join("\n");
+                            Some(Msg::ExecuteCustomQuery(query))
+                        },
+                        WidgetKind::Search => {
+                            let pattern = res.join("\n");
+                            Some(Msg::SearchPattern(pattern))
+                        },
+                    }
+                },
 
                 Msg::None => None,
             }

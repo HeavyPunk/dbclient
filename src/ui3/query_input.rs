@@ -2,7 +2,7 @@ use ratatui::{layout::Alignment, style::{Color, Modifier, Style}, widgets::Clear
 use tui_realm_textarea::{TextArea, TEXTAREA_CMD_NEWLINE, TEXTAREA_STATUS_FMT};
 use tuirealm::{command::{Cmd, CmdResult, Direction, Position}, event::{Key, KeyEvent}, props::{BorderType, Borders, PropPayload, PropValue}, AttrValue, Attribute, Component, Event, MockComponent};
 
-use super::{AppEvent, Msg};
+use super::{AppEvent, Msg, WidgetKind, INPUT_POPUP_WIDGET_KIND};
 
 #[derive(Clone)]
 enum InputMode {
@@ -48,7 +48,7 @@ impl Default for QueryInput {
             );
         Self {
             component: text_area,
-            input_mode: InputMode::Normal,
+            input_mode: InputMode::Input,
         }
     }
 }
@@ -108,18 +108,24 @@ impl Component<Msg, AppEvent> for QueryInput {
             InputMode::Normal => {
                 match ev {
                     Event::Keyboard(KeyEvent { code: Key::Enter, ..}) => {
-                        let query = match self.component.perform(Cmd::Submit) {
+                        let widget_type = WidgetKind::try_from(
+                            self.query(Attribute::Custom(INPUT_POPUP_WIDGET_KIND))
+                                .unwrap()
+                                .unwrap_payload()
+                                .unwrap_one()
+                                .as_u8()
+                                .unwrap())
+                            .unwrap();
+                        let edit_result = match self.component.perform(Cmd::Submit) {
                             CmdResult::Submit(state) => {
                                 let state_lines: Vec<String> = state.unwrap_vec().iter().map(|state_val| state_val.clone().unwrap_string()).collect();
-                                state_lines.concat()
+                                state_lines
                             },
-                            _ => "".to_string()
+                            _ => vec![]
                         };
-                        Some(Msg::ExecuteCustomQuery(query))
+                        Some(Msg::EditorResult(widget_type, edit_result))
                     }
                     Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::DiactivateEditor),
-                    Event::Keyboard(KeyEvent { code: Key::Char('J'), ..}) => Some(Msg::ToQueryResultWidget),
-                    Event::Keyboard(KeyEvent { code: Key::Char('H'), ..}) => Some(Msg::ToDbObjectsWidget),
                     Event::Keyboard(KeyEvent { code: Key::Char('i'), .. }) => {
                         self.input_mode = InputMode::Input;
                         Some(Msg::None)

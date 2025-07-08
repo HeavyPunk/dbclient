@@ -2,7 +2,7 @@ use ratatui::{layout::Alignment, style::Color};
 use tui_realm_stdlib::{List};
 use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, TableBuilder, TextSpan}, AttrValue, Attribute, Component, Event, MockComponent};
 
-use super::{AppEvent, Msg};
+use super::{AppEvent, Msg, WidgetKind, APP_SEARCH_PATTERN};
 
 #[derive(MockComponent)]
 pub struct DbObjects {
@@ -34,6 +34,49 @@ impl Component<Msg, AppEvent> for DbObjects {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
             Event::Keyboard(KeyEvent { code: Key::Char('r'), .. }) => Some(Msg::FetchDbObjects),
+            Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(WidgetKind::Search)),
+            Event::Keyboard(KeyEvent { code: Key::Char('n'), .. }) => {
+                let attr_val = self.query(Attribute::Custom(APP_SEARCH_PATTERN));
+                match attr_val {
+                    Some(val) => match val {
+                        AttrValue::String(pattern) => {
+                            let current_list = self.get_current_list();
+                            let start_index = self.component.states.list_index;
+                            self.component.states.incr_list_index(true);
+                            while self.component.states.list_index != start_index {
+                                if current_list.get(self.component.states.list_index).unwrap().contains(&pattern) {
+                                    break
+                                }
+                                self.component.states.incr_list_index(true);
+                            }
+                            return None;
+                        },
+                        _ => return Some(Msg::None)
+                    },
+                    None => return Some(Msg::None),
+                };
+            },
+            Event::Keyboard(KeyEvent { code: Key::Char('N'), .. }) => {
+                let attr_val = self.query(Attribute::Custom(APP_SEARCH_PATTERN));
+                match attr_val {
+                    Some(val) => match val {
+                        AttrValue::String(pattern) => {
+                            let current_list = self.get_current_list();
+                            let start_index = self.component.states.list_index;
+                            self.component.states.decr_list_index(true);
+                            while self.component.states.list_index != start_index {
+                                if current_list.get(self.component.states.list_index).unwrap().contains(&pattern) {
+                                    break
+                                }
+                                self.component.states.decr_list_index(true);
+                            }
+                            return None;
+                        },
+                        _ => return Some(Msg::None)
+                    },
+                    None => return Some(Msg::None),
+                };
+            },
             Event::Keyboard(KeyEvent { code: Key::Char('j'), .. }) => {
                 self.component.states.incr_list_index(true);
                 Some(Msg::None)
@@ -74,6 +117,19 @@ impl DbObjects {
             }
         });
         table.build()
+    }
+
+    pub fn get_current_list(&self) -> Vec<String> {
+        match self.component.query(Attribute::Content) {
+            Some(val) => match val {
+                AttrValue::Table(list) => {
+                    let result = list.iter().map(|row| row.first().unwrap().content.clone()).collect();
+                    result
+                },
+                _ => vec![]
+            },
+            None => vec![],
+        }
     }
 }
 
