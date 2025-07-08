@@ -3,6 +3,7 @@ use std::{collections::HashMap, usize};
 use crate::dbclient::{fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}};
 
 
+#[ignore = "integration tests are disabled for automated runners"]
 #[test]
 fn test_int() {
     let mut redis = RedisFetcher {
@@ -23,6 +24,7 @@ fn test_int() {
     assert_eq!(result, Ok(FetchResult{ table: Some((vec![index_key], expected)) }))
 }
 
+#[ignore = "integration tests are disabled for automated runners"]
 #[test]
 fn test_string() {
     let mut redis = RedisFetcher {
@@ -43,6 +45,7 @@ fn test_string() {
     assert_eq!(result, Ok(FetchResult{ table: Some((vec![index_key], expected)) }))
 }
 
+#[ignore = "integration tests are disabled for automated runners"]
 #[test]
 fn test_hash() {
     let mut redis = RedisFetcher {
