@@ -77,15 +77,15 @@ impl Component<Msg, AppEvent> for DbObjects {
                     None => return Some(Msg::None),
                 };
             },
-            Event::Keyboard(KeyEvent { code: Key::Char('j'), .. }) => {
+            Event::Keyboard(KeyEvent { code: Key::Char('j') | Key::Down, .. }) => {
                 self.component.states.incr_list_index(true);
                 Some(Msg::None)
             },
-            Event::Keyboard(KeyEvent { code: Key::Char('k'), .. }) => {
+            Event::Keyboard(KeyEvent { code: Key::Char('k') | Key::Up, .. }) => {
                 self.component.states.decr_list_index(true);
                 Some(Msg::None)
             },
-            Event::Keyboard(KeyEvent { code: Key::Char('L'), ..}) => Some(Msg::ToQueryResultWidget),
+            Event::Keyboard(KeyEvent { code: Key::Char('L') | Key::Right, ..}) => Some(Msg::ToQueryResultWidget),
             Event::Keyboard(KeyEvent { code: Key::Enter, .. }) => {
                 match self.component.query(Attribute::Content) {
                     Some(val) => match val {

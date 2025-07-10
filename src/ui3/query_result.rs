@@ -34,13 +34,13 @@ impl Component<Msg, AppEvent> for QueryResult {
     fn on(&mut self, ev: tuirealm::Event<AppEvent>) -> Option<Msg> {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
-            Event::Keyboard(KeyEvent { code: Key::Char('H'), ..}) => Some(Msg::ToDbObjectsWidget),
+            Event::Keyboard(KeyEvent { code: Key::Char('H') | Key::Left, ..}) => Some(Msg::ToDbObjectsWidget),
             Event::Keyboard(KeyEvent { code: Key::Char('q'), ..}) => Some(Msg::ActivateEditor(WidgetKind::Query)),
-            Event::Keyboard(KeyEvent { code: Key::Char('j'), ..}) => {
+            Event::Keyboard(KeyEvent { code: Key::Char('j') | Key::Down, ..}) => {
                 self.component.states.incr_list_index(true);
                 Some(Msg::None)
             },
-            Event::Keyboard(KeyEvent { code: Key::Char('k'), ..}) => {
+            Event::Keyboard(KeyEvent { code: Key::Char('k') | Key::Up, ..}) => {
                 self.component.states.decr_list_index(true);
                 Some(Msg::None)
             },

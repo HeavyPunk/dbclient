@@ -43,26 +43,26 @@ dbclient --config-path config.toml
 ### Keyboard Shortcuts
 
 #### Main page:
-- `j|k` - Navigate through connections
+- `j|k|↑|↓` - Navigate through connections
 - `Enter` - Go to query page with selected connection
 - `<Esc>` - Quit
 
 #### Query page
 - Database objects widget:
-    - `j|k` - Navigate through objects
+    - `j|k|↑|↓` - Navigate through objects
     - `/` - Search
     - `n` - Go to next search pattern matching
     - `N` - Go to previous search pattern matching
     - `<Enter>` - Get all items in selected object
-    - `L` - Go to query result widget
+    - `L|→` - Go to query result widget
     - `<Esc>` - Quit to main page
 - Query result widget:
-    - `j|k` - Navigate through records
+    - `j|k|↑|↓` - Navigate through records
     - `/` - Search
     - `n` - Go to next search pattern matching
     - `N` - Go to previous search pattern matching
     - `q` - Open query input popup
-    - `H` - Go to database objects widget
+    - `H|←` - Go to database objects widget
     - `g` - Go to the first record (in future will be replaced with `gg`)
     - `G` - Go to the last record
     - `<Esc>` - Quit
