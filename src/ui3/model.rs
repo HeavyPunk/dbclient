@@ -1,7 +1,7 @@
 use std::{cmp::min, collections::HashMap, default, time::Duration, usize};
 use ratatui::layout::{Alignment, Constraint, Direction, Rect};
 use tuirealm::{props::{Layout, PropPayload, PropValue}, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
-use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_input::QueryInput, query_result::QueryResult, WidgetKind, INPUT_POPUP_WIDGET_KIND}};
+use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_input::{EditorPopup, EditorType, EditorInput}, query_result::QueryResult, INPUT_POPUP_WIDGET_KIND}};
 
 use super::{AppEvent, Id, Msg, Page, APP_SEARCH_PATTERN};
 
@@ -286,21 +286,7 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                 },
                 Msg::ActivateEditor(widget_kind) => {
                     self.show_editor = true;
-                    assert!(self.app.mount(Id::QueryLine, Box::<QueryInput>::default(), vec![]).is_ok());
-                    assert!(match widget_kind {
-                        WidgetKind::Query => {
-                            self.app
-                                .attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Query".to_string(), Alignment::Left)))
-                                .and(self.app
-                                    .attr(&Id::QueryLine, Attribute::Custom(INPUT_POPUP_WIDGET_KIND), AttrValue::Payload(PropPayload::One(PropValue::U8(widget_kind.into())))))
-                        },
-                        WidgetKind::Search => {
-                            self.app
-                                .attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Search".to_string(), Alignment::Left)))
-                                .and(self.app
-                                    .attr(&Id::QueryLine, Attribute::Custom(INPUT_POPUP_WIDGET_KIND), AttrValue::Payload(PropPayload::One(PropValue::U8(widget_kind.into())))))
-                        },
-                    }.is_ok());
+                    assert!(self.app.mount(Id::QueryLine, Box::new(EditorPopup::new(widget_kind)), vec![]).is_ok());
                     assert!(self.app.active(&Id::QueryLine).is_ok());
                     None
                 },
@@ -313,20 +299,20 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                     None
                 },
 
-                Msg::EditorResult(widget_kind, res) => {
-                    match widget_kind {
-                        WidgetKind::Query => {
-                            let query = res.join("\n");
-                            Some(Msg::ExecuteCustomQuery(query))
-                        },
-                        WidgetKind::Search => {
-                            let pattern = res.join("\n");
+                Msg::EditorResult(editor_type, editors) => {
+                    match editor_type {
+                        super::EditorType::Search => {
+                            let pattern = editors.get("search").unwrap_or(&vec![]).join("\n");
                             Some(Msg::SearchPattern(pattern))
+                        },
+                        super::EditorType::Query => {
+                            let query = editors.get("query").unwrap_or(&vec![]).join("\n");
+                            Some(Msg::ExecuteCustomQuery(query))
                         },
                     }
                 },
 
-                Msg::None => None,
+                Msg::None | Msg::EditorAccept => None,
             }
         } else {
             None

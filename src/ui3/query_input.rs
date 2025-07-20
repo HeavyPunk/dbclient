@@ -1,8 +1,10 @@
-use ratatui::{layout::Alignment, style::{Color, Modifier, Style}, widgets::Clear};
+use std::collections::HashMap;
+
+use ratatui::{layout::{Alignment, Constraint, Direction as RatatuiDirection, Layout}, style::{Color, Modifier, Style}, widgets::Clear};
 use tui_realm_textarea::{TextArea, TEXTAREA_CMD_NEWLINE, TEXTAREA_STATUS_FMT};
 use tuirealm::{command::{Cmd, CmdResult, Direction, Position}, event::{Key, KeyEvent}, props::{BorderType, Borders, PropPayload, PropValue}, AttrValue, Attribute, Component, Event, MockComponent};
 
-use super::{AppEvent, Msg, WidgetKind, INPUT_POPUP_WIDGET_KIND};
+use super::{AppEvent, Msg};
 
 #[derive(Clone)]
 enum InputMode {
@@ -28,32 +30,124 @@ impl Into<Style> for InputMode {
     }
 }
 
-pub struct QueryInput {
-    component: TextArea<'static>,
-    input_mode: InputMode,
+pub enum EditorType {
+    Multiline,
+    Oneline,
 }
 
-impl Default for QueryInput {
-    fn default() -> Self {
-        let text_area = TextArea::default()
-            .title("Editor", Alignment::Left)
-            .layout_margin(0)
-            .scroll_step(1)
-            .cursor_line_style(Style::default())
-            .cursor_style(Style::default().add_modifier(Modifier::REVERSED))
-            .borders(
-                Borders::default()
-                    .modifiers(BorderType::Rounded)
-                    .color(Color::Yellow)
-            );
+pub struct EditorPopup {
+    editor_type: crate::ui3::EditorType,
+    components: Vec<(Box<EditorInput>, EditorType)>,
+    selected_component_index: usize,
+}
+
+impl EditorPopup {
+    pub fn new(editor_type: crate::ui3::EditorType) -> Self {
+        let components = match editor_type {
+            super::EditorType::Search => vec![
+                (Box::new(EditorInput::new("Search", "search")), EditorType::Oneline)
+            ],
+            super::EditorType::Query => vec![
+                (Box::new(EditorInput::new("query", "query")), EditorType::Multiline)
+            ],
+        };
+
         Self {
-            component: text_area,
-            input_mode: InputMode::Input,
+            editor_type,
+            components,
+            selected_component_index: 0
         }
     }
 }
 
-impl Component<Msg, AppEvent> for QueryInput {
+impl Component<Msg, AppEvent> for EditorPopup {
+    fn on(&mut self, ev: Event<AppEvent>) -> Option<Msg> {
+        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
+        match component.on(ev) {
+            Some(Msg::EditorAccept) => {
+                let editors_results: HashMap<_, _> = self.components.iter_mut().map(|c| {
+                    let edit_result = match c.0.perform(Cmd::Submit) {
+                        CmdResult::Submit(state) => {
+                            let state_lines: Vec<String> = state.unwrap_vec()
+                                .iter().map(|state_val| state_val.clone().unwrap_string()).collect();
+                            state_lines
+                        },
+                        _ => vec![]
+                    };
+                    (c.0.editor_type, edit_result)
+                }).collect();
+                Some(Msg::EditorResult(self.editor_type.clone(), editors_results))
+            },
+            m => m
+        }
+    }
+}
+
+impl MockComponent for EditorPopup {
+    fn view(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
+        let constraints = self.components.iter().map(|(_, editor_type)| match editor_type {
+            EditorType::Multiline => Constraint::Fill(1),
+            EditorType::Oneline => Constraint::Max(4),
+        });
+        let chunks = Layout::default()
+            .direction(RatatuiDirection::Vertical)
+            .constraints(constraints)
+            .split(area);
+
+        for (index, (component, _)) in self.components.iter_mut().enumerate() {
+            component.view(frame, chunks[index]);
+        }
+    }
+
+    fn query(&self, attr: Attribute) -> Option<AttrValue> {
+        let (component, _) = self.components.get(self.selected_component_index).unwrap();
+        component.query(attr)
+    }
+
+    fn attr(&mut self, attr: Attribute, value: AttrValue) {
+        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
+        component.attr(attr, value)
+    }
+
+    fn state(&self) -> tuirealm::State {
+        let (component, _) = self.components.get(self.selected_component_index).unwrap();
+        component.state()
+    }
+
+    fn perform(&mut self, cmd: Cmd) -> CmdResult {
+        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
+        component.perform(cmd)
+    }
+}
+
+pub struct EditorInput {
+    component: TextArea<'static>,
+    input_mode: InputMode,
+    pub editor_type: &'static str,
+}
+
+impl EditorInput {
+    pub fn new(title: &'static str, editor_type: &'static str) -> Self {
+        Self {
+            component: TextArea::default()
+                .title(title, Alignment::Left)
+                .layout_margin(0)
+                .scroll_step(1)
+                .cursor_line_style(Style::default())
+                .cursor_style(Style::default().add_modifier(Modifier::REVERSED))
+                .borders(
+                    Borders::default()
+                        .modifiers(BorderType::Rounded)
+                        .color(Color::Yellow)
+                )
+            ,
+            input_mode: InputMode::Input,
+            editor_type
+        }
+    }
+}
+
+impl Component<Msg, AppEvent> for EditorInput {
     fn on(&mut self, ev: tuirealm::Event<AppEvent>) -> Option<Msg> {
         self.component.attr(
             Attribute::Custom(TEXTAREA_STATUS_FMT),
@@ -107,24 +201,8 @@ impl Component<Msg, AppEvent> for QueryInput {
             },
             InputMode::Normal => {
                 match ev {
-                    Event::Keyboard(KeyEvent { code: Key::Enter, ..}) => {
-                        let widget_type = WidgetKind::try_from(
-                            self.query(Attribute::Custom(INPUT_POPUP_WIDGET_KIND))
-                                .unwrap()
-                                .unwrap_payload()
-                                .unwrap_one()
-                                .as_u8()
-                                .unwrap())
-                            .unwrap();
-                        let edit_result = match self.component.perform(Cmd::Submit) {
-                            CmdResult::Submit(state) => {
-                                let state_lines: Vec<String> = state.unwrap_vec().iter().map(|state_val| state_val.clone().unwrap_string()).collect();
-                                state_lines
-                            },
-                            _ => vec![]
-                        };
-                        Some(Msg::EditorResult(widget_type, edit_result))
-                    }
+                    Event::Keyboard(KeyEvent { code: Key::Enter, ..}) => Some(Msg::EditorAccept),
+                
                     Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::DiactivateEditor),
                     Event::Keyboard(KeyEvent { code: Key::Char('i'), .. }) => {
                         self.input_mode = InputMode::Input;
@@ -172,7 +250,7 @@ impl Component<Msg, AppEvent> for QueryInput {
     }
 }
 
-impl MockComponent for QueryInput {
+impl MockComponent for EditorInput {
     fn view(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
         frame.render_widget(Clear, area);
         self.component.view(frame, area);
