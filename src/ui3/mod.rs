@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 use crate::dbclient::fetcher::{FetchRequest, FetchResult};
 
@@ -7,6 +7,7 @@ pub mod connections_list;
 pub mod db_objects;
 pub mod query_result;
 pub mod query_input;
+pub mod editor_popup;
 
 pub const INPUT_POPUP_WIDGET_KIND: &str = "input-popup-widget-kind";
 pub const APP_SEARCH_PATTERN: &str = "app-search-pattern";
@@ -23,9 +24,11 @@ pub enum Msg {
     ToConnectionsPage,
     FetchDbObjects,
     FetchDbObject(String),
+    AddDbObject(String, String, String),
     ExecuteCustomQuery(String),
     ExecuteQuery(FetchRequest),
     EditorAccept,
+    EditorPopupNext,
     EditorResult(EditorType, HashMap<&'static str, Vec<String>>),
     SearchPattern(String),
     ToQueryResultWidget,
@@ -57,5 +60,6 @@ pub enum Page {
 pub enum EditorType {
     Search,
     Query,
+    AddDbObject,
 }
 

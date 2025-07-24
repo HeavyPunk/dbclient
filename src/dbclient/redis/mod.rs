@@ -30,46 +30,74 @@ impl Fetcher for RedisFetcher {
         match request.query.first() {
             Some(query) => match query {
                 QueryElement::RawQuery(query) => {
-                    let mut cmd = Cmd::new();
-                    let args: Vec<&str> = query.split(' ').collect();
-                    cmd.arg(args);
+                                let mut cmd = Cmd::new();
+                                let args: Vec<&str> = query.split(' ').collect();
+                                cmd.arg(args);
 
-                    let res = cmd.query(&mut connection)?;
+                                let res = cmd.query(&mut connection)?;
 
-                    Ok(FetchResult::from_redis_value(&res)?)
-                },
+                                Ok(FetchResult::from_redis_value(&res)?)
+                            },
                 QueryElement::ListAllItemsFrom(index) => {
-                    let index_type = get_index_type(index, &mut connection)?;
+                                let index_type = get_index_type(index, &mut connection)?;
+                                let res = match index_type {
+                                    RedisType::String => {
+                                        let res: String = connection.get(index)?;
+                                        FetchResult::single(&res)
+                                    },
+                                    RedisType::List => {
+                                        let res: Vec<String> = connection.lrange(index, 0, -1)?;
+                                        FetchResult::multiple(&res)
+                                    },
+                                    RedisType::Set => {
+                                        let res: Vec<String> = connection.smembers(index)?;
+                                        FetchResult::multiple(&res)
+                                    },
+                                    RedisType::Zset => {
+                                        let res: Vec<String> = connection.zrange(index, 0, -1)?;
+                                        FetchResult::multiple(&res)
+                                    },
+                                    RedisType::Hash => {
+                                        let res: HashMap<String, String> = connection.hgetall(index)?;
+                                        FetchResult::key_value(res)
+                                    },
+                                    RedisType::Stream => {
+                                        FetchResult::none()
+                                    },
+                                    RedisType::None => {
+                                        FetchResult::none()
+                                    },
+                                };
+                    
+                                // Ok(FetchResult::from_redis_value(&res)?)
+                                Ok(res)
+                            },
+                QueryElement::AddDatabaseObject(_, obj_type, name) => {
+                    let index_type = get_index_type(obj_type, &mut connection)?;
                     let res = match index_type {
                         RedisType::String => {
-                            let res: String = connection.get(index)?;
+                            let res: String = connection.set(name, "initial")?;
                             FetchResult::single(&res)
                         },
                         RedisType::List => {
-                            let res: Vec<String> = connection.lrange(index, 0, -1)?;
-                            FetchResult::multiple(&res)
+                            let res: String = connection.lpush(name, "initial")?;
+                            FetchResult::single(&res)
                         },
                         RedisType::Set => {
-                            let res: Vec<String> = connection.smembers(index)?;
-                            FetchResult::multiple(&res)
+                            let res: String = connection.sadd(name, "initial")?;
+                            FetchResult::single(&res)
                         },
                         RedisType::Zset => {
-                            let res: Vec<String> = connection.zrange(index, 0, -1)?;
-                            FetchResult::multiple(&res)
+                            let res: String = connection.zadd(name, "initial", 0)?;
+                            FetchResult::single(&res)
                         },
                         RedisType::Hash => {
-                            let res: HashMap<String, String> = connection.hgetall(index)?;
-                            FetchResult::key_value(res)
+                            let res: String = connection.hset(name, "init_key", "init_val")?;
+                            FetchResult::single(&res)
                         },
-                        RedisType::Stream => {
-                            FetchResult::none()
-                        },
-                        RedisType::None => {
-                            FetchResult::none()
-                        },
+                        RedisType::Stream => unimplemented!(),
+                        RedisType::None => FetchResult::none(),
                     };
-                    
-                    // Ok(FetchResult::from_redis_value(&res)?)
                     Ok(res)
                 },
             },

@@ -30,95 +30,6 @@ impl Into<Style> for InputMode {
     }
 }
 
-pub enum EditorType {
-    Multiline,
-    Oneline,
-}
-
-pub struct EditorPopup {
-    editor_type: crate::ui3::EditorType,
-    components: Vec<(Box<EditorInput>, EditorType)>,
-    selected_component_index: usize,
-}
-
-impl EditorPopup {
-    pub fn new(editor_type: crate::ui3::EditorType) -> Self {
-        let components = match editor_type {
-            super::EditorType::Search => vec![
-                (Box::new(EditorInput::new("Search", "search")), EditorType::Oneline)
-            ],
-            super::EditorType::Query => vec![
-                (Box::new(EditorInput::new("query", "query")), EditorType::Multiline)
-            ],
-        };
-
-        Self {
-            editor_type,
-            components,
-            selected_component_index: 0
-        }
-    }
-}
-
-impl Component<Msg, AppEvent> for EditorPopup {
-    fn on(&mut self, ev: Event<AppEvent>) -> Option<Msg> {
-        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
-        match component.on(ev) {
-            Some(Msg::EditorAccept) => {
-                let editors_results: HashMap<_, _> = self.components.iter_mut().map(|c| {
-                    let edit_result = match c.0.perform(Cmd::Submit) {
-                        CmdResult::Submit(state) => {
-                            let state_lines: Vec<String> = state.unwrap_vec()
-                                .iter().map(|state_val| state_val.clone().unwrap_string()).collect();
-                            state_lines
-                        },
-                        _ => vec![]
-                    };
-                    (c.0.editor_type, edit_result)
-                }).collect();
-                Some(Msg::EditorResult(self.editor_type.clone(), editors_results))
-            },
-            m => m
-        }
-    }
-}
-
-impl MockComponent for EditorPopup {
-    fn view(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
-        let constraints = self.components.iter().map(|(_, editor_type)| match editor_type {
-            EditorType::Multiline => Constraint::Fill(1),
-            EditorType::Oneline => Constraint::Max(4),
-        });
-        let chunks = Layout::default()
-            .direction(RatatuiDirection::Vertical)
-            .constraints(constraints)
-            .split(area);
-
-        for (index, (component, _)) in self.components.iter_mut().enumerate() {
-            component.view(frame, chunks[index]);
-        }
-    }
-
-    fn query(&self, attr: Attribute) -> Option<AttrValue> {
-        let (component, _) = self.components.get(self.selected_component_index).unwrap();
-        component.query(attr)
-    }
-
-    fn attr(&mut self, attr: Attribute, value: AttrValue) {
-        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
-        component.attr(attr, value)
-    }
-
-    fn state(&self) -> tuirealm::State {
-        let (component, _) = self.components.get(self.selected_component_index).unwrap();
-        component.state()
-    }
-
-    fn perform(&mut self, cmd: Cmd) -> CmdResult {
-        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
-        component.perform(cmd)
-    }
-}
 
 pub struct EditorInput {
     component: TextArea<'static>,
@@ -202,6 +113,7 @@ impl Component<Msg, AppEvent> for EditorInput {
             InputMode::Normal => {
                 match ev {
                     Event::Keyboard(KeyEvent { code: Key::Enter, ..}) => Some(Msg::EditorAccept),
+                    Event::Keyboard(KeyEvent { code: Key::Tab, ..}) => Some(Msg::EditorPopupNext),
                 
                     Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::DiactivateEditor),
                     Event::Keyboard(KeyEvent { code: Key::Char('i'), .. }) => {

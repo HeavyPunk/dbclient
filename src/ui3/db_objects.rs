@@ -34,6 +34,7 @@ impl Component<Msg, AppEvent> for DbObjects {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
             Event::Keyboard(KeyEvent { code: Key::Char('r'), .. }) => Some(Msg::FetchDbObjects),
+            Event::Keyboard(KeyEvent { code: Key::Char('a'), ..}) => Some(Msg::ActivateEditor(EditorType::AddDbObject)),
             Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(EditorType::Search)),
             Event::Keyboard(KeyEvent { code: Key::Char('n'), .. }) => {
                 let attr_val = self.query(Attribute::Custom(APP_SEARCH_PATTERN));
