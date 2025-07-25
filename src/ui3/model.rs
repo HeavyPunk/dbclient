@@ -299,6 +299,10 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                 },
 
                 Msg::EditorResult(editor_type, editors) => {
+                    if self.app.mounted(&Id::QueryLine) {
+                        assert!(self.app.umount(&Id::QueryLine).is_ok());
+                    }
+                    
                     match editor_type {
                         super::EditorType::Search => {
                             let pattern = editors.get("search").unwrap_or(&vec![]).join("\n");
@@ -319,7 +323,7 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
 
                 Msg::EditorPopupNext => {
                     assert!(self.app.active(&Id::QueryLine).is_ok());
-                    None
+                    Some(Msg::None)
                 }
 
                 Msg::None | Msg::EditorAccept => None,

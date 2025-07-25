@@ -8,6 +8,7 @@ pub mod db_objects;
 pub mod query_result;
 pub mod query_input;
 pub mod editor_popup;
+pub mod editor_simple_input;
 
 pub const INPUT_POPUP_WIDGET_KIND: &str = "input-popup-widget-kind";
 pub const APP_SEARCH_PATTERN: &str = "app-search-pattern";

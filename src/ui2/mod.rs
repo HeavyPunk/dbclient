@@ -189,10 +189,6 @@ pub fn draw(config: Config) {
     let mut main_page = MainPage::new(&mut terminal, config);
     main_page.render(&mut terminal);
     main_page.run_event_loop(&mut terminal);
-    // let mut query_page = QueryPage::new(&mut terminal);
-    // query_page.render(&mut terminal);
-    // query_page.run_event_loop(&mut terminal);
-
     ratatui::restore();
 }
 

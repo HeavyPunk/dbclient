@@ -22,6 +22,23 @@ pub enum RedisType {
     None,
 }
 
+impl<'a> TryFrom<&'a str> for RedisType {
+    type Error = FetcherError;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        match value {
+            "string" => Ok(RedisType::String),
+            "list" => Ok(RedisType::List),
+            "set" => Ok(RedisType::Set),
+            "zset" => Ok(RedisType::Zset),
+            "hash" => Ok(RedisType::Hash),
+            "stream" => Ok(RedisType::Stream),
+            "none" => Ok(RedisType::None),
+            _ => Err(FetcherError::InvalidQuery)
+        }
+    }
+}
+
 impl Fetcher for RedisFetcher {
     fn fetch(&mut self, request: &super::fetcher::FetchRequest) -> Result<super::fetcher::FetchResult, super::fetcher::FetcherError> {
         let client = redis::Client::open(self.config.uri.clone())?;
@@ -69,11 +86,10 @@ impl Fetcher for RedisFetcher {
                                     },
                                 };
                     
-                                // Ok(FetchResult::from_redis_value(&res)?)
                                 Ok(res)
                             },
                 QueryElement::AddDatabaseObject(_, obj_type, name) => {
-                    let index_type = get_index_type(obj_type, &mut connection)?;
+                    let index_type = obj_type.as_str().try_into()?;
                     let res = match index_type {
                         RedisType::String => {
                             let res: String = connection.set(name, "initial")?;
@@ -140,16 +156,7 @@ fn get_index_type(index: &String, mut connection: &mut Connection) -> Result<Red
         Some(table) => {
             match table.1.iter().last() {
                 Some((_, column)) => match column.first() {
-                    Some(val) => match val.as_str() {
-                        "string" => Ok(RedisType::String),
-                        "list" => Ok(RedisType::List),
-                        "set" => Ok(RedisType::Set),
-                        "zset" => Ok(RedisType::Zset),
-                        "hash" => Ok(RedisType::Hash),
-                        "stream" => Ok(RedisType::Stream),
-                        "none" => Ok(RedisType::None),
-                        _ => Err(FetcherError::InvalidQuery)
-                    },
+                    Some(val) => val.as_str().try_into(),
                     None => Err(FetcherError::InvalidQuery),
                 },
                 None => Err(FetcherError::InvalidQuery),

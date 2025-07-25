@@ -4,7 +4,7 @@ use ratatui::{layout::{Alignment, Constraint, Direction as RatatuiDirection, Lay
 use tui_realm_textarea::{TextArea, TEXTAREA_CMD_NEWLINE, TEXTAREA_STATUS_FMT};
 use tuirealm::{command::{Cmd, CmdResult, Direction, Position}, event::{Key, KeyEvent}, props::{BorderType, Borders, PropPayload, PropValue}, AttrValue, Attribute, Component, Event, MockComponent};
 
-use super::{AppEvent, Msg};
+use super::{AppEvent, Msg, editor_popup::EditorPopupWidget};
 
 #[derive(Clone)]
 enum InputMode {
@@ -182,6 +182,29 @@ impl MockComponent for EditorInput {
 
     fn perform(&mut self, cmd: Cmd) -> CmdResult {
         self.component.perform(cmd)
+    }
+}
+
+impl EditorPopupWidget for EditorInput {
+    fn get_content(&self) -> Vec<String> {
+        match self.component.state() {
+            tuirealm::State::One(text_val) => {
+                text_val.unwrap_string()
+                    .lines()
+                    .map(|s| s.to_string())
+                    .collect()
+            },
+            tuirealm::State::Vec(lines) => {
+                lines.iter()
+                    .map(|v| v.clone().unwrap_string())
+                    .collect()
+            },
+            _ => vec![]
+        }
+    }
+    
+    fn get_editor_type(&self) -> &'static str {
+        self.editor_type
     }
 }
 

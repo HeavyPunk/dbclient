@@ -68,7 +68,6 @@ where
                                 run_query_page(terminal, fetcher);
                             },
                         };
-                        // let query_page = QueryPage::new(terminal, fetcher)
                         crate::ui2::WidgetReaction::Nothing
                     },
                     KeyEvent { code: KeyCode::Char('j'), modifiers: _, kind: _, state: _ } => {
