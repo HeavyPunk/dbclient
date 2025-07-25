@@ -132,7 +132,7 @@ impl MockComponent for EditorPopup {
 
         let constraints = self.components.iter().map(|(_, editor_type)| match editor_type {
             EditorType::Multiline => Constraint::Fill(1),
-            EditorType::Oneline => Constraint::Max(4),
+            EditorType::Oneline => Constraint::Max(3),
         });
         let chunks = Layout::default()
             .direction(RatatuiDirection::Vertical)
