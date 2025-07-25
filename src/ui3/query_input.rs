@@ -1,8 +1,10 @@
-use ratatui::{layout::Alignment, style::{Color, Modifier, Style}, widgets::Clear};
+use std::collections::HashMap;
+
+use ratatui::{layout::{Alignment, Constraint, Direction as RatatuiDirection, Layout}, style::{Color, Modifier, Style}, widgets::Clear};
 use tui_realm_textarea::{TextArea, TEXTAREA_CMD_NEWLINE, TEXTAREA_STATUS_FMT};
 use tuirealm::{command::{Cmd, CmdResult, Direction, Position}, event::{Key, KeyEvent}, props::{BorderType, Borders, PropPayload, PropValue}, AttrValue, Attribute, Component, Event, MockComponent};
 
-use super::{AppEvent, Msg, WidgetKind, INPUT_POPUP_WIDGET_KIND};
+use super::{AppEvent, Msg, editor_popup::EditorPopupWidget};
 
 #[derive(Clone)]
 enum InputMode {
@@ -28,32 +30,35 @@ impl Into<Style> for InputMode {
     }
 }
 
-pub struct QueryInput {
+
+pub struct EditorInput {
     component: TextArea<'static>,
     input_mode: InputMode,
+    pub editor_type: &'static str,
 }
 
-impl Default for QueryInput {
-    fn default() -> Self {
-        let text_area = TextArea::default()
-            .title("Editor", Alignment::Left)
-            .layout_margin(0)
-            .scroll_step(1)
-            .cursor_line_style(Style::default())
-            .cursor_style(Style::default().add_modifier(Modifier::REVERSED))
-            .borders(
-                Borders::default()
-                    .modifiers(BorderType::Rounded)
-                    .color(Color::Yellow)
-            );
+impl EditorInput {
+    pub fn new(title: &'static str, editor_type: &'static str) -> Self {
         Self {
-            component: text_area,
+            component: TextArea::default()
+                .title(title, Alignment::Left)
+                .layout_margin(0)
+                .scroll_step(1)
+                .cursor_line_style(Style::default())
+                .cursor_style(Style::default().add_modifier(Modifier::REVERSED))
+                .borders(
+                    Borders::default()
+                        .modifiers(BorderType::Rounded)
+                        .color(Color::Yellow)
+                )
+            ,
             input_mode: InputMode::Input,
+            editor_type
         }
     }
 }
 
-impl Component<Msg, AppEvent> for QueryInput {
+impl Component<Msg, AppEvent> for EditorInput {
     fn on(&mut self, ev: tuirealm::Event<AppEvent>) -> Option<Msg> {
         self.component.attr(
             Attribute::Custom(TEXTAREA_STATUS_FMT),
@@ -107,24 +112,9 @@ impl Component<Msg, AppEvent> for QueryInput {
             },
             InputMode::Normal => {
                 match ev {
-                    Event::Keyboard(KeyEvent { code: Key::Enter, ..}) => {
-                        let widget_type = WidgetKind::try_from(
-                            self.query(Attribute::Custom(INPUT_POPUP_WIDGET_KIND))
-                                .unwrap()
-                                .unwrap_payload()
-                                .unwrap_one()
-                                .as_u8()
-                                .unwrap())
-                            .unwrap();
-                        let edit_result = match self.component.perform(Cmd::Submit) {
-                            CmdResult::Submit(state) => {
-                                let state_lines: Vec<String> = state.unwrap_vec().iter().map(|state_val| state_val.clone().unwrap_string()).collect();
-                                state_lines
-                            },
-                            _ => vec![]
-                        };
-                        Some(Msg::EditorResult(widget_type, edit_result))
-                    }
+                    Event::Keyboard(KeyEvent { code: Key::Enter, ..}) => Some(Msg::EditorAccept),
+                    Event::Keyboard(KeyEvent { code: Key::Tab, ..}) => Some(Msg::EditorPopupNext),
+                
                     Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::DiactivateEditor),
                     Event::Keyboard(KeyEvent { code: Key::Char('i'), .. }) => {
                         self.input_mode = InputMode::Input;
@@ -172,7 +162,7 @@ impl Component<Msg, AppEvent> for QueryInput {
     }
 }
 
-impl MockComponent for QueryInput {
+impl MockComponent for EditorInput {
     fn view(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
         frame.render_widget(Clear, area);
         self.component.view(frame, area);
@@ -192,6 +182,29 @@ impl MockComponent for QueryInput {
 
     fn perform(&mut self, cmd: Cmd) -> CmdResult {
         self.component.perform(cmd)
+    }
+}
+
+impl EditorPopupWidget for EditorInput {
+    fn get_content(&self) -> Vec<String> {
+        match self.component.state() {
+            tuirealm::State::One(text_val) => {
+                text_val.unwrap_string()
+                    .lines()
+                    .map(|s| s.to_string())
+                    .collect()
+            },
+            tuirealm::State::Vec(lines) => {
+                lines.iter()
+                    .map(|v| v.clone().unwrap_string())
+                    .collect()
+            },
+            _ => vec![]
+        }
+    }
+    
+    fn get_editor_type(&self) -> &'static str {
+        self.editor_type
     }
 }
 

@@ -2,7 +2,7 @@ use ratatui::{layout::Alignment, style::Color};
 use tui_realm_stdlib::{List};
 use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, TableBuilder, TextSpan}, AttrValue, Attribute, Component, Event, MockComponent};
 
-use super::{AppEvent, Msg, WidgetKind, APP_SEARCH_PATTERN};
+use super::{AppEvent, EditorType, Msg, APP_SEARCH_PATTERN};
 
 #[derive(MockComponent)]
 pub struct DbObjects {
@@ -34,7 +34,8 @@ impl Component<Msg, AppEvent> for DbObjects {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
             Event::Keyboard(KeyEvent { code: Key::Char('r'), .. }) => Some(Msg::FetchDbObjects),
-            Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(WidgetKind::Search)),
+            Event::Keyboard(KeyEvent { code: Key::Char('a'), ..}) => Some(Msg::ActivateEditor(EditorType::AddDbObject)),
+            Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(EditorType::Search)),
             Event::Keyboard(KeyEvent { code: Key::Char('n'), .. }) => {
                 let attr_val = self.query(Attribute::Custom(APP_SEARCH_PATTERN));
                 match attr_val {

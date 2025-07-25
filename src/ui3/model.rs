@@ -1,7 +1,7 @@
-use std::{cmp::min, collections::HashMap, default, time::Duration, usize};
+use std::{cmp::min, collections::HashMap, default, ops::Deref, path::Path, time::Duration, usize};
 use ratatui::layout::{Alignment, Constraint, Direction, Rect};
 use tuirealm::{props::{Layout, PropPayload, PropValue}, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
-use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, query_input::QueryInput, query_result::QueryResult, WidgetKind, INPUT_POPUP_WIDGET_KIND}};
+use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, editor_popup::EditorPopup, query_input::EditorInput, query_result::QueryResult, INPUT_POPUP_WIDGET_KIND}};
 
 use super::{AppEvent, Id, Msg, Page, APP_SEARCH_PATTERN};
 
@@ -42,7 +42,6 @@ impl Model<CrosstermTerminalAdapter> {
         assert!(app.mount(Id::ConnectionsList, Box::<ConnectionsListComponent>::default(), vec![]).is_ok());
         assert!(app.mount(Id::DbObjects, Box::<DbObjects>::default(), vec![]).is_ok());
         assert!(app.mount(Id::QueryResult, Box::<QueryResult>::default(), vec![]).is_ok());
-        // assert!(app.mount(Id::QueryLine, Box::<QueryInput>::default(), vec![]).is_ok());
 
         assert!(app.active(&Id::ConnectionsList).is_ok());
 
@@ -96,7 +95,7 @@ impl Model<CrosstermTerminalAdapter> {
                         self.app.view(&Id::DbObjects, f, chunks[0]);
                         self.app.view(&Id::QueryResult, f, chunks[1]);
                         if self.show_editor {
-                            self.app.view(&Id::QueryLine, f, Self::centered_rect(80, 10, f.area()));
+                            self.app.view(&Id::QueryLine, f, Self::centered_rect(80, 20, f.area()));
                         }
                     }).is_ok()
                 );
@@ -164,6 +163,14 @@ impl Model<CrosstermTerminalAdapter> {
     fn fetch_db_object(&mut self, object: String) -> Option<Msg> {
         let query = FetchRequest {
             query: vec![QueryElement::ListAllItemsFrom(object)],
+            limit: usize::MAX
+        };
+        return Some(Msg::ExecuteQuery(query));
+    }
+
+    fn add_db_object(&mut self, path: String, object_type: String, name: String) -> Option<Msg> {
+        let query = FetchRequest {
+            query: vec![QueryElement::AddDatabaseObject(path, object_type, name)],
             limit: usize::MAX
         };
         return Some(Msg::ExecuteQuery(query));
@@ -253,25 +260,17 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                     assert!(self.app.active(&Id::ConnectionsList).is_ok());
                     None
                 },
-                Msg::FetchDbObjects => {
-                    self.reload_db_objects()
-                },
+                Msg::FetchDbObjects => self.reload_db_objects(),
 
-                Msg::FetchDbObject(object) => {
-                    self.fetch_db_object(object)
-                },
+                Msg::FetchDbObject(object) => self.fetch_db_object(object),
 
-                Msg::ExecuteCustomQuery(query) => {
-                    self.execute_custom_query(query)
-                },
+                Msg::AddDbObject(path, object_type, name) => self.add_db_object(path, object_type, name),
 
-                Msg::SearchPattern(pattern) => {
-                    self.search_pattern(pattern)
-                }
+                Msg::ExecuteCustomQuery(query) => self.execute_custom_query(query),
 
-                Msg::ExecuteQuery(query) => {
-                    self.reload_query_result(&query)
-                },
+                Msg::SearchPattern(pattern) => self.search_pattern(pattern),
+
+                Msg::ExecuteQuery(query) => self.reload_query_result(&query),
                 
                 Msg::ToDbObjectsWidget => {
                     self.query_page_selected_widget = Id::DbObjects;
@@ -286,21 +285,7 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                 },
                 Msg::ActivateEditor(widget_kind) => {
                     self.show_editor = true;
-                    assert!(self.app.mount(Id::QueryLine, Box::<QueryInput>::default(), vec![]).is_ok());
-                    assert!(match widget_kind {
-                        WidgetKind::Query => {
-                            self.app
-                                .attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Query".to_string(), Alignment::Left)))
-                                .and(self.app
-                                    .attr(&Id::QueryLine, Attribute::Custom(INPUT_POPUP_WIDGET_KIND), AttrValue::Payload(PropPayload::One(PropValue::U8(widget_kind.into())))))
-                        },
-                        WidgetKind::Search => {
-                            self.app
-                                .attr(&Id::QueryLine, Attribute::Title, AttrValue::Title(("Search".to_string(), Alignment::Left)))
-                                .and(self.app
-                                    .attr(&Id::QueryLine, Attribute::Custom(INPUT_POPUP_WIDGET_KIND), AttrValue::Payload(PropPayload::One(PropValue::U8(widget_kind.into())))))
-                        },
-                    }.is_ok());
+                    assert!(self.app.mount(Id::QueryLine, Box::new(EditorPopup::new(widget_kind)), vec![]).is_ok());
                     assert!(self.app.active(&Id::QueryLine).is_ok());
                     None
                 },
@@ -313,20 +298,35 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter>
                     None
                 },
 
-                Msg::EditorResult(widget_kind, res) => {
-                    match widget_kind {
-                        WidgetKind::Query => {
-                            let query = res.join("\n");
+                Msg::EditorResult(editor_type, editors) => {
+                    if self.app.mounted(&Id::QueryLine) {
+                        assert!(self.app.umount(&Id::QueryLine).is_ok());
+                    }
+                    
+                    match editor_type {
+                        super::EditorType::Search => {
+                            let pattern = editors.get("search").unwrap_or(&vec![]).join("\n");
+                            Some(Msg::SearchPattern(pattern))
+                        },
+                        super::EditorType::Query => {
+                            let query = editors.get("query").unwrap_or(&vec![]).join("\n");
                             Some(Msg::ExecuteCustomQuery(query))
                         },
-                        WidgetKind::Search => {
-                            let pattern = res.join("\n");
-                            Some(Msg::SearchPattern(pattern))
+                        super::EditorType::AddDbObject => {
+                            let root = editors.get("root").unwrap_or(&vec![]).join("\n");
+                            let obj_type = editors.get("type").unwrap_or(&vec![]).join("\n");
+                            let name = editors.get("name").unwrap_or(&vec![]).join("\n");
+                            Some(Msg::AddDbObject(root, obj_type, name))
                         },
                     }
                 },
 
-                Msg::None => None,
+                Msg::EditorPopupNext => {
+                    assert!(self.app.active(&Id::QueryLine).is_ok());
+                    Some(Msg::None)
+                }
+
+                Msg::None | Msg::EditorAccept => None,
             }
         } else {
             None

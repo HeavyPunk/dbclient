@@ -3,7 +3,7 @@ use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, Table
 
 use crate::dbclient::fetcher::FetchResult;
 
-use super::{AppEvent, Msg, WidgetKind, APP_SEARCH_PATTERN};
+use super::{AppEvent, EditorType, Msg, APP_SEARCH_PATTERN};
 
 #[derive(MockComponent)]
 pub struct QueryResult {
@@ -35,7 +35,7 @@ impl Component<Msg, AppEvent> for QueryResult {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
             Event::Keyboard(KeyEvent { code: Key::Char('H') | Key::Left, ..}) => Some(Msg::ToDbObjectsWidget),
-            Event::Keyboard(KeyEvent { code: Key::Char('q'), ..}) => Some(Msg::ActivateEditor(WidgetKind::Query)),
+            Event::Keyboard(KeyEvent { code: Key::Char('q'), ..}) => Some(Msg::ActivateEditor(EditorType::Query)),
             Event::Keyboard(KeyEvent { code: Key::Char('j') | Key::Down, ..}) => {
                 self.component.states.incr_list_index(true);
                 Some(Msg::None)
@@ -44,7 +44,7 @@ impl Component<Msg, AppEvent> for QueryResult {
                 self.component.states.decr_list_index(true);
                 Some(Msg::None)
             },
-            Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(WidgetKind::Search)),
+            Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(EditorType::Search)),
             Event::Keyboard(KeyEvent { code: Key::Char('g'), .. }) => {
                 self.component.states.list_index_at_first();
                 Some(Msg::None)
