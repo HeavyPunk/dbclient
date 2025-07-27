@@ -1,6 +1,6 @@
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
-use crate::dbclient::fetcher::{FetchRequest, FetchResult};
+use crate::dbclient::fetcher::FetchRequest;
 
 pub mod model;
 pub mod connections_list;
@@ -10,13 +10,7 @@ pub mod query_input;
 pub mod editor_popup;
 pub mod editor_simple_input;
 
-pub const INPUT_POPUP_WIDGET_KIND: &str = "input-popup-widget-kind";
 pub const APP_SEARCH_PATTERN: &str = "app-search-pattern";
-
-#[derive(Debug)]
-pub enum AppError {
-    InternalError(&'static str)
-}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Msg {
@@ -41,7 +35,6 @@ pub enum Msg {
 
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd)]
 pub enum AppEvent {
-    ErrorInitialized,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]

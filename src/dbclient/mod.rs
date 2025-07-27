@@ -16,21 +16,6 @@ pub(crate) mod fetcher {
         pub table: Option<(Vec<IndexColumn>, HashMap<String, Vec<String>>)>,
     }
 
-    impl FetchResult {
-        pub fn get_table_height(&self) -> usize {
-            match &self.table {
-                Some(table) => table.1.values().map(|v| v.len()).max().unwrap_or(0),
-                None => 0,
-            }
-        }
-        pub fn get_table_width(&self) -> usize {
-            match &self.table {
-                Some(table) => table.1.keys().len(),
-                None => 0,
-            }
-        }
-    }
-
     #[derive(Debug, PartialEq, Clone)]
     pub struct Row {
         pub columns: Vec<String>

@@ -6,7 +6,6 @@ use ui3::model::Model;
 mod cli;
 mod config;
 mod dbclient;
-mod ui2;
 mod ui3;
 
 fn main() {

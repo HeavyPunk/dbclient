@@ -1,7 +1,7 @@
-use std::{cmp::min, collections::HashMap, default, ops::Deref, path::Path, time::Duration, usize};
-use ratatui::layout::{Alignment, Constraint, Direction, Rect};
-use tuirealm::{props::{Layout, PropPayload, PropValue}, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
-use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, FetchResult, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, editor_popup::EditorPopup, query_input::EditorInput, query_result::QueryResult, INPUT_POPUP_WIDGET_KIND}};
+use std::{cmp::min, collections::HashMap, time::Duration, usize};
+use ratatui::layout::{Constraint, Direction, Rect};
+use tuirealm::{props::Layout, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
+use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, editor_popup::EditorPopup, query_result::QueryResult}};
 
 use super::{AppEvent, Id, Msg, Page, APP_SEARCH_PATTERN};
 
