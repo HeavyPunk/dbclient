@@ -1,6 +1,6 @@
 use ratatui::{layout::Alignment, style::Color};
 use tui_realm_stdlib::Input;
-use tuirealm::{command::Cmd, event::{Key, KeyEvent}, Component, Event, MockComponent, AttrValue, Attribute};
+use tuirealm::{command::Cmd, event::{Key, KeyEvent}, props::BorderType, AttrValue, Attribute, Component, Event, MockComponent};
 
 use crate::ui3::{editor_popup::EditorPopupWidget, AppEvent, Msg};
 
@@ -15,7 +15,7 @@ impl EditorSimpleInput {
         Self {
             component: Input::default()
                 .title(title, Alignment::Left)
-                .borders(tuirealm::props::Borders::default().color(Color::Yellow)),
+                .borders(tuirealm::props::Borders::default().modifiers(BorderType::Rounded).color(Color::Yellow)),
             editor_type,
         }
     }

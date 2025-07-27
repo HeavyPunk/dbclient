@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ratatui::{layout::{Constraint, Direction as RatatuiDirection, Layout}, widgets::{Block, Borders, Clear}, style::Color};
-use tuirealm::{command::{Cmd, CmdResult}, AttrValue, Attribute, Component, Event, MockComponent, event::KeyEvent};
+use tuirealm::{command::{Cmd, CmdResult}, event::KeyEvent, props::BorderType, AttrValue, Attribute, Component, Event, MockComponent};
 
 use crate::ui3::editor_simple_input::EditorSimpleInput;
 use crate::ui3::query_input::EditorInput;
@@ -119,20 +119,53 @@ impl Component<Msg, AppEvent> for EditorPopup {
 
 impl MockComponent for EditorPopup {
     fn view(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
-        frame.render_widget(Clear, area);
-
-        let block = Block::default()
-            .title(self.get_title())
-            .borders(Borders::ALL)
-            .border_style(Color::White);
+        let mut total_height = 0u16;
+        for (_, editor_type) in &self.components {
+            let component_height = match editor_type {
+                EditorType::Multiline => 10,
+                EditorType::Oneline => 3,
+            };
+            total_height += component_height;
+        }
         
-        frame.render_widget(block, area);
+        if self.components.len() > 1 {
+            total_height += 2;
+        }
         
-        let inner_area = area.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 });
+        let content_width = 60u16.min(area.width);
+        
+        let actual_height = total_height.min(area.height);
+        let actual_width = content_width;
+        
+        let x = area.x + (area.width.saturating_sub(actual_width)) / 2;
+        let y = area.y + (area.height.saturating_sub(actual_height)) / 2;
+        
+        let popup_area = ratatui::layout::Rect {
+            x,
+            y,
+            width: actual_width,
+            height: actual_height,
+        };
+        
+        frame.render_widget(Clear, popup_area);
+        
+        let inner_area = if self.components.len() > 1 {
+            let block = Block::default()
+                .title(self.get_title())
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Color::White);
+            
+            frame.render_widget(block, popup_area);
+            popup_area.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 })
+        } else {
+            popup_area
+        };
+        
 
         let constraints = self.components.iter().map(|(_, editor_type)| match editor_type {
-            EditorType::Multiline => Constraint::Fill(1),
-            EditorType::Oneline => Constraint::Max(3),
+            EditorType::Multiline => Constraint::Length(10),
+            EditorType::Oneline => Constraint::Length(3),
         });
         let chunks = Layout::default()
             .direction(RatatuiDirection::Vertical)

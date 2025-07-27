@@ -1,4 +1,4 @@
-use ratatui::{layout::Alignment, style::{Color, Modifier, Style}, widgets::Clear};
+use ratatui::{layout::Alignment, style::{Color, Modifier, Style}};
 use tui_realm_textarea::{TextArea, TEXTAREA_CMD_NEWLINE, TEXTAREA_STATUS_FMT};
 use tuirealm::{command::{Cmd, CmdResult, Direction, Position}, event::{Key, KeyEvent}, props::{BorderType, Borders, PropPayload, PropValue}, AttrValue, Attribute, Component, Event, MockComponent};
 
@@ -162,7 +162,6 @@ impl Component<Msg, AppEvent> for EditorInput {
 
 impl MockComponent for EditorInput {
     fn view(&mut self, frame: &mut ratatui::Frame, area: ratatui::prelude::Rect) {
-        frame.render_widget(Clear, area);
         self.component.view(frame, area);
     }
 
