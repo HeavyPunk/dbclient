@@ -1,5 +1,9 @@
 use ratatui::{layout::Alignment, style::Color};
-use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, TableBuilder, TextSpan}, Component, Event, MockComponent};
+use tuirealm::{
+    event::{Key, KeyEvent},
+    props::{BorderType, Borders, Table, TableBuilder, TextSpan},
+    Component, Event, MockComponent,
+};
 
 use crate::config::Connection;
 
@@ -7,7 +11,7 @@ use super::{AppEvent, Msg};
 
 #[derive(MockComponent)]
 pub struct ConnectionsListComponent {
-    component: tui_realm_stdlib::Table
+    component: tui_realm_stdlib::Table,
 }
 
 impl Default for ConnectionsListComponent {
@@ -22,8 +26,8 @@ impl Default for ConnectionsListComponent {
                 .borders(
                     Borders::default()
                         .modifiers(BorderType::Rounded)
-                        .color(Color::Yellow)
-                )
+                        .color(Color::Yellow),
+                ),
         }
     }
 }
@@ -32,18 +36,26 @@ impl Component<Msg, AppEvent> for ConnectionsListComponent {
     fn on(&mut self, ev: tuirealm::Event<AppEvent>) -> Option<Msg> {
         match ev {
             Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::AppClose),
-            Event::Keyboard(KeyEvent { code: Key::Char('j') | Key::Down, .. }) => {
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('j') | Key::Down,
+                ..
+            }) => {
                 self.component.states.incr_list_index(true);
                 Some(Msg::None)
-            },
-            Event::Keyboard(KeyEvent { code: Key::Char('k') | Key::Up, .. }) => {
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Char('k') | Key::Up,
+                ..
+            }) => {
                 self.component.states.decr_list_index(true);
                 Some(Msg::None)
-            },
-            Event::Keyboard(KeyEvent { code: Key::Enter, .. }) => {
+            }
+            Event::Keyboard(KeyEvent {
+                code: Key::Enter, ..
+            }) => {
                 let selected_connection = self.component.states.list_index;
                 Some(Msg::ToQueryPage(selected_connection))
-            },
+            }
             _ => Some(Msg::None),
         }
     }
@@ -66,4 +78,3 @@ impl ConnectionsListComponent {
         table.build()
     }
 }
-

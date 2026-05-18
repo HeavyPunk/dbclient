@@ -1,6 +1,6 @@
 //#[cfg(feature = "redis")]
-pub mod redis;
 pub mod dummy;
+pub mod redis;
 
 pub mod query_builder;
 
@@ -18,7 +18,7 @@ pub(crate) mod fetcher {
 
     #[derive(Debug, PartialEq, Clone)]
     pub struct Row {
-        pub columns: Vec<String>
+        pub columns: Vec<String>,
     }
 
     #[derive(Debug, PartialEq, Clone)]
@@ -49,7 +49,10 @@ pub(crate) mod fetcher {
             FetchResult { table: None }
         }
 
-        pub fn single<T>(item: &T) -> FetchResult where T: ToString {
+        pub fn single<T>(item: &T) -> FetchResult
+        where
+            T: ToString,
+        {
             let mut table = HashMap::new();
             let index_column = "result".to_string();
             table.insert(index_column.clone(), vec![item.to_string()]);
@@ -59,11 +62,19 @@ pub(crate) mod fetcher {
             }
         }
 
-        pub fn multiple<T>(items: &Vec<T>) -> FetchResult where T: ToString {
+        pub fn multiple<T>(items: &Vec<T>) -> FetchResult
+        where
+            T: ToString,
+        {
             let mut table = HashMap::new();
             let index_column = "result".to_string();
-            table.insert(index_column.clone(), items.iter().map(|item| item.to_string()).collect());
-            FetchResult { table: Some((vec![index_column], table)) }
+            table.insert(
+                index_column.clone(),
+                items.iter().map(|item| item.to_string()).collect(),
+            );
+            FetchResult {
+                table: Some((vec![index_column], table)),
+            }
         }
 
         pub fn key_value(items: HashMap<String, String>) -> FetchResult {
@@ -73,7 +84,9 @@ pub(crate) mod fetcher {
             let index_column = "keys".to_string();
             table.insert(index_column.clone(), keys);
             table.insert("values".to_string(), values);
-            FetchResult { table: Some((vec![index_column], table)) }
+            FetchResult {
+                table: Some((vec![index_column], table)),
+            }
         }
 
         pub fn merge(result1: &FetchResult, result2: &FetchResult) -> FetchResult {
@@ -84,10 +97,14 @@ pub(crate) mod fetcher {
                 (Some(t1), Some(t2)) => {
                     let mut merged_table = t1.clone();
                     for (key, value) in t2.1 {
-                        merged_table.1.entry(key).or_insert_with(Vec::new).extend(value);
+                        merged_table
+                            .1
+                            .entry(key)
+                            .or_insert_with(Vec::new)
+                            .extend(value);
                     }
                     Some(merged_table)
-                },
+                }
             };
             FetchResult { table }
         }
@@ -108,10 +125,9 @@ pub(crate) mod fetcher {
                         merged_table.insert(format!("{}_2", key).to_string(), value.to_vec());
                     }
                     Some((index_keys, merged_table))
-                },
+                }
             };
             FetchResult { table: table }
         }
     }
 }
-

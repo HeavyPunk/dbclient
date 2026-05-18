@@ -6,7 +6,7 @@ use std::fmt;
 pub enum ConnectionType {
     Redis,
     Postgres,
-    MySql
+    MySql,
 }
 
 impl fmt::Display for ConnectionType {
@@ -24,10 +24,10 @@ impl fmt::Display for ConnectionType {
 pub struct Connection {
     pub connection_type: ConnectionType,
     pub name: String,
-    pub connection_string: String
+    pub connection_string: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-    pub connections: Vec<Connection>
+    pub connections: Vec<Connection>,
 }

@@ -1,14 +1,23 @@
 use std::collections::HashMap;
 
-use ratatui::{layout::{Constraint, Direction as RatatuiDirection, Layout}, widgets::{Block, Borders, Clear}, style::Color};
-use tuirealm::{command::{Cmd, CmdResult}, event::KeyEvent, props::BorderType, AttrValue, Attribute, Component, Event, MockComponent};
+use ratatui::{
+    layout::{Constraint, Direction as RatatuiDirection, Layout},
+    style::Color,
+    widgets::{Block, Borders, Clear},
+};
+use tuirealm::{
+    command::{Cmd, CmdResult},
+    event::KeyEvent,
+    props::BorderType,
+    AttrValue, Attribute, Component, Event, MockComponent,
+};
 
 use crate::ui3::editor_simple_input::EditorSimpleInput;
 use crate::ui3::query_input::EditorInput;
 
 use super::{AppEvent, Msg};
 
-pub trait EditorPopupWidget :Component<Msg, AppEvent> {
+pub trait EditorPopupWidget: Component<Msg, AppEvent> {
     fn get_content(&self) -> Vec<String>;
     fn get_editor_type(&self) -> &'static str;
 }
@@ -26,26 +35,37 @@ pub struct EditorPopup {
 
 impl EditorPopup {
     pub fn new(editor_type: crate::ui3::EditorType) -> Self {
-        let components : Vec<(Box<dyn EditorPopupWidget>, EditorType)>= match editor_type {
-            super::EditorType::Search => vec![
-                        (Box::new(EditorSimpleInput::new("Search", "search")), EditorType::Oneline)
-                    ],
-            super::EditorType::Query => vec![
-                        (Box::new(EditorInput::new("Query", "query")), EditorType::Multiline)
-                    ],
+        let components: Vec<(Box<dyn EditorPopupWidget>, EditorType)> = match editor_type {
+            super::EditorType::Search => vec![(
+                Box::new(EditorSimpleInput::new("Search", "search")),
+                EditorType::Oneline,
+            )],
+            super::EditorType::Query => vec![(
+                Box::new(EditorInput::new("Query", "query")),
+                EditorType::Multiline,
+            )],
             super::EditorType::AddDbObject => vec![
-                (Box::new(EditorSimpleInput::new("Root", "root")), EditorType::Oneline),
-                (Box::new(EditorSimpleInput::new("Type", "type")), EditorType::Oneline),
-                (Box::new(EditorSimpleInput::new("Name", "name")), EditorType::Oneline),
+                (
+                    Box::new(EditorSimpleInput::new("Root", "root")),
+                    EditorType::Oneline,
+                ),
+                (
+                    Box::new(EditorSimpleInput::new("Type", "type")),
+                    EditorType::Oneline,
+                ),
+                (
+                    Box::new(EditorSimpleInput::new("Name", "name")),
+                    EditorType::Oneline,
+                ),
             ],
         };
 
         let mut popup = Self {
             editor_type,
             components,
-            selected_component_index: 0
+            selected_component_index: 0,
         };
-        
+
         popup.update_focus();
         popup
     }
@@ -54,7 +74,7 @@ impl EditorPopup {
         for (component, _) in &mut self.components {
             component.attr(Attribute::Focus, AttrValue::Flag(false));
         }
-        
+
         if let Some((component, _)) = self.components.get_mut(self.selected_component_index) {
             component.attr(Attribute::Focus, AttrValue::Flag(true));
         }
@@ -85,7 +105,10 @@ impl EditorPopup {
 
 impl Component<Msg, AppEvent> for EditorPopup {
     fn on(&mut self, ev: Event<AppEvent>) -> Option<Msg> {
-        if let Event::Keyboard(KeyEvent { code, modifiers, .. }) = &ev {
+        if let Event::Keyboard(KeyEvent {
+            code, modifiers, ..
+        }) = &ev
+        {
             match code {
                 tuirealm::event::Key::Tab => {
                     if modifiers.contains(tuirealm::event::KeyModifiers::SHIFT) {
@@ -94,25 +117,32 @@ impl Component<Msg, AppEvent> for EditorPopup {
                         self.next_component();
                     }
                     return Some(Msg::None);
-                },
+                }
                 _ => {}
             }
         }
 
-        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
+        let (component, _) = self
+            .components
+            .get_mut(self.selected_component_index)
+            .unwrap();
         match component.on(ev) {
             Some(Msg::EditorAccept) => {
-                let editors_results: HashMap<_, _> = self.components.iter().map(|c| {
-                    let content = c.0.get_content();
-                    (c.0.get_editor_type(), content)
-                }).collect();
+                let editors_results: HashMap<_, _> = self
+                    .components
+                    .iter()
+                    .map(|c| {
+                        let content = c.0.get_content();
+                        (c.0.get_editor_type(), content)
+                    })
+                    .collect();
                 Some(Msg::EditorResult(self.editor_type.clone(), editors_results))
-            },
+            }
             Some(Msg::EditorPopupNext) => {
                 self.next_component();
                 Some(Msg::None)
             }
-            m => m
+            m => m,
         }
     }
 }
@@ -127,46 +157,51 @@ impl MockComponent for EditorPopup {
             };
             total_height += component_height;
         }
-        
+
         if self.components.len() > 1 {
             total_height += 2;
         }
-        
+
         let content_width = 60u16.min(area.width);
-        
+
         let actual_height = total_height.min(area.height);
         let actual_width = content_width;
-        
+
         let x = area.x + (area.width.saturating_sub(actual_width)) / 2;
         let y = area.y + (area.height.saturating_sub(actual_height)) / 2;
-        
+
         let popup_area = ratatui::layout::Rect {
             x,
             y,
             width: actual_width,
             height: actual_height,
         };
-        
+
         frame.render_widget(Clear, popup_area);
-        
+
         let inner_area = if self.components.len() > 1 {
             let block = Block::default()
                 .title(self.get_title())
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Color::White);
-            
+
             frame.render_widget(block, popup_area);
-            popup_area.inner(ratatui::layout::Margin { horizontal: 1, vertical: 1 })
+            popup_area.inner(ratatui::layout::Margin {
+                horizontal: 1,
+                vertical: 1,
+            })
         } else {
             popup_area
         };
-        
 
-        let constraints = self.components.iter().map(|(_, editor_type)| match editor_type {
-            EditorType::Multiline => Constraint::Length(10),
-            EditorType::Oneline => Constraint::Length(3),
-        });
+        let constraints = self
+            .components
+            .iter()
+            .map(|(_, editor_type)| match editor_type {
+                EditorType::Multiline => Constraint::Length(10),
+                EditorType::Oneline => Constraint::Length(3),
+            });
         let chunks = Layout::default()
             .direction(RatatuiDirection::Vertical)
             .constraints(constraints)
@@ -185,11 +220,16 @@ impl MockComponent for EditorPopup {
     fn attr(&mut self, attr: Attribute, value: AttrValue) {
         match (attr, &value) {
             (Attribute::Focus, AttrValue::Flag(_)) => {
-                self.components.iter_mut().for_each(|c| c.0.attr(Attribute::Focus, AttrValue::Flag(false)));
-            },
-            _ => ()
+                self.components
+                    .iter_mut()
+                    .for_each(|c| c.0.attr(Attribute::Focus, AttrValue::Flag(false)));
+            }
+            _ => (),
         };
-        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
+        let (component, _) = self
+            .components
+            .get_mut(self.selected_component_index)
+            .unwrap();
         component.attr(attr, value)
     }
 
@@ -199,7 +239,10 @@ impl MockComponent for EditorPopup {
     }
 
     fn perform(&mut self, cmd: Cmd) -> CmdResult {
-        let (component, _) = self.components.get_mut(self.selected_component_index).unwrap();
+        let (component, _) = self
+            .components
+            .get_mut(self.selected_component_index)
+            .unwrap();
         component.perform(cmd)
     }
 }

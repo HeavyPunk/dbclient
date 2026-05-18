@@ -1,7 +1,13 @@
 use ratatui::{layout::Alignment, style::Color};
-use tuirealm::{AttrValue, Attribute, Component, MockComponent, props::{BorderType, Borders, Table, TableBuilder, TextSpan}};
+use tuirealm::{
+    props::{BorderType, Borders, Table, TableBuilder, TextSpan},
+    AttrValue, Attribute, Component, MockComponent,
+};
 
-use crate::{dbclient::fetcher::FetchResult, ui3::query_result::widgets::{QueryResultWidget, WidgetContext}};
+use crate::{
+    dbclient::fetcher::FetchResult,
+    ui3::query_result::widgets::{QueryResultWidget, WidgetContext},
+};
 
 use super::{AppEvent, Msg, APP_SEARCH_PATTERN};
 
@@ -12,7 +18,7 @@ pub const ATTRIBUTE_CONTENT_TYPE: &str = "attribute-content-type";
 #[repr(isize)]
 #[derive(Debug, PartialEq)]
 pub enum ContentType {
-    Table = 0
+    Table = 0,
 }
 
 #[derive(MockComponent)]
@@ -32,12 +38,12 @@ impl Default for QueryResult {
             .borders(
                 Borders::default()
                     .modifiers(BorderType::Rounded)
-                    .color(Color::Yellow)
+                    .color(Color::Yellow),
             );
 
         Self {
             content_type: ContentType::Table,
-            component: QueryResultWidget::Table(table)
+            component: QueryResultWidget::Table(table),
         }
     }
 }
@@ -50,10 +56,10 @@ impl Component<Msg, AppEvent> for QueryResult {
                     0 => ContentType::Table,
                     _ => return Some(Msg::None),
                 },
-                _ => return Some(Msg::None)
+                _ => return Some(Msg::None),
             },
             //NOTE: Nothing to display here, so travel to db objects widgets
-            None => return Some(Msg::ToDbObjectsWidget)
+            None => return Some(Msg::ToDbObjectsWidget),
         };
 
         let content = self.query(Attribute::Content);
@@ -61,7 +67,7 @@ impl Component<Msg, AppEvent> for QueryResult {
 
         if self.content_type != content_type {
             self.component = match content_type {
-                ContentType::Table => {       
+                ContentType::Table => {
                     let mut table = tui_realm_stdlib::Table::default()
                         .title("Result", Alignment::Left)
                         .highlighted_color(Color::Yellow)
@@ -71,7 +77,7 @@ impl Component<Msg, AppEvent> for QueryResult {
                         .borders(
                             Borders::default()
                                 .modifiers(BorderType::Rounded)
-                                .color(Color::Yellow)
+                                .color(Color::Yellow),
                         );
                     if let Some(content) = content {
                         table.attr(Attribute::Content, content);
@@ -80,7 +86,7 @@ impl Component<Msg, AppEvent> for QueryResult {
                         table.attr(Attribute::Focus, focus);
                     }
                     QueryResultWidget::Table(table)
-                },
+                }
             };
         }
 
@@ -89,7 +95,7 @@ impl Component<Msg, AppEvent> for QueryResult {
             match self.query(Attribute::Custom(APP_SEARCH_PATTERN)) {
                 Some(val) => match val {
                     AttrValue::String(pattern) => res.push(WidgetContext::SearchPattern(pattern)),
-                    _ => {},
+                    _ => {}
                 },
                 None => (),
             };
@@ -107,7 +113,12 @@ impl QueryResult {
         let mut table_builder = TableBuilder::default();
         let table = result.table.unwrap();
 
-        let headers: Vec<TextSpan> = table.1.keys().cloned().map(|key| TextSpan::new(key)).collect();
+        let headers: Vec<TextSpan> = table
+            .1
+            .keys()
+            .cloned()
+            .map(|key| TextSpan::new(key))
+            .collect();
         for header in headers {
             table_builder.add_col(header);
         }
@@ -116,11 +127,13 @@ impl QueryResult {
         for row_index in 0..max_len {
             table_builder.add_row();
             for column in table.1.values() {
-                let val = column.get(row_index).cloned().unwrap_or_else(|| "".to_string());
+                let val = column
+                    .get(row_index)
+                    .cloned()
+                    .unwrap_or_else(|| "".to_string());
                 table_builder.add_col(TextSpan::new(val));
             }
         }
         table_builder.build()
     }
 }
-
