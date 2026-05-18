@@ -11,13 +11,11 @@ mod ui3;
 fn main() {
     let args = Cli::parse();
 
-    let config_content = std::fs::read_to_string(&args.config_path)
-        .expect("Failed to read config file");
+    let config_content =
+        std::fs::read_to_string(&args.config_path).expect("Failed to read config file");
 
-    let config: Config = toml::from_str(&config_content)
-        .expect("Failed to parse config file");
+    let config: Config = toml::from_str(&config_content).expect("Failed to parse config file");
 
     // ui2::draw(config);
     Model::new(&config).main_loop();
 }
-

@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use crate::dbclient::fetcher::FetchRequest;
 
-pub mod model;
 pub mod connections_list;
 pub mod db_objects;
-pub mod query_result;
-pub mod query_input;
 pub mod editor_popup;
 pub mod editor_simple_input;
+pub mod model;
+pub mod query_input;
+pub mod query_result;
 
 pub const APP_SEARCH_PATTERN: &str = "app-search-pattern";
 
@@ -34,8 +34,7 @@ pub enum Msg {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd)]
-pub enum AppEvent {
-}
+pub enum AppEvent {}
 
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
 pub enum Id {
@@ -47,7 +46,7 @@ pub enum Id {
 
 pub enum Page {
     Connections,
-    Query
+    Query,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -56,4 +55,3 @@ pub enum EditorType {
     Query,
     AddDbObject,
 }
-

@@ -1,6 +1,11 @@
 use ratatui::{layout::Alignment, style::Color};
 use tui_realm_stdlib::Input;
-use tuirealm::{command::Cmd, event::{Key, KeyEvent}, props::BorderType, AttrValue, Attribute, Component, Event, MockComponent};
+use tuirealm::{
+    command::Cmd,
+    event::{Key, KeyEvent},
+    props::BorderType,
+    AttrValue, Attribute, Component, Event, MockComponent,
+};
 
 use crate::ui3::{editor_popup::EditorPopupWidget, AppEvent, Msg};
 
@@ -9,13 +14,14 @@ pub struct EditorSimpleInput {
     pub editor_type: &'static str,
 }
 
-
 impl EditorSimpleInput {
     pub fn new(title: &'static str, editor_type: &'static str) -> Self {
         Self {
-            component: Input::default()
-                .title(title, Alignment::Left)
-                .borders(tuirealm::props::Borders::default().modifiers(BorderType::Rounded).color(Color::Yellow)),
+            component: Input::default().title(title, Alignment::Left).borders(
+                tuirealm::props::Borders::default()
+                    .modifiers(BorderType::Rounded)
+                    .color(Color::Yellow),
+            ),
             editor_type,
         }
     }
@@ -31,11 +37,11 @@ impl Component<Msg, AppEvent> for EditorSimpleInput {
                 Key::Backspace => {
                     self.component.perform(Cmd::Delete);
                     Some(Msg::None)
-                },
+                }
                 Key::Char(c) => {
                     self.component.perform(Cmd::Type(c));
                     Some(Msg::None)
-                },
+                }
                 _ => None,
             },
             _ => None,
@@ -47,7 +53,7 @@ impl EditorPopupWidget for EditorSimpleInput {
     fn get_content(&self) -> Vec<String> {
         vec![self.component.states.get_value()]
     }
-    
+
     fn get_editor_type(&self) -> &'static str {
         self.editor_type
     }
@@ -67,7 +73,7 @@ impl MockComponent for EditorSimpleInput {
             let border_color = if *focused { Color::Yellow } else { Color::Gray };
             self.component.attr(
                 Attribute::Borders,
-                AttrValue::Borders(tuirealm::props::Borders::default().color(border_color))
+                AttrValue::Borders(tuirealm::props::Borders::default().color(border_color)),
             );
         }
         self.component.attr(attr, value);

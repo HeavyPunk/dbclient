@@ -2,5 +2,5 @@
 pub enum QueryElement {
     RawQuery(String),
     ListAllItemsFrom(String),
-    AddDatabaseObject(String, String, String)
+    AddDatabaseObject(String, String, String),
 }
