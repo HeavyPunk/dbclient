@@ -13,6 +13,13 @@
             "program": "${workspaceFolder}/target/debug/dbclient"
         },
         {
+          "name": "[CODELLDB] Debug",
+          "type": "codelldb",
+          "request": "launch",
+          "args": ["--config-path", "${workspaceFolder}/tests.config.toml"],
+          "program": "${workspaceFolder}/target/debug/dbclient"
+        },
+        {
             "name": "Attach to Process",
             "type": "gdb",
             "request": "attach",

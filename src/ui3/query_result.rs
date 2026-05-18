@@ -1,13 +1,24 @@
 use ratatui::{layout::Alignment, style::Color};
-use tuirealm::{event::{Key, KeyEvent}, props::{BorderType, Borders, Table, TableBuilder, TextSpan}, AttrValue, Attribute, Component, Event, MockComponent};
+use tuirealm::{AttrValue, Attribute, Component, MockComponent, props::{BorderType, Borders, Table, TableBuilder, TextSpan}};
 
-use crate::dbclient::fetcher::FetchResult;
+use crate::{dbclient::fetcher::FetchResult, ui3::query_result::widgets::{QueryResultWidget, WidgetContext}};
 
-use super::{AppEvent, EditorType, Msg, APP_SEARCH_PATTERN};
+use super::{AppEvent, Msg, APP_SEARCH_PATTERN};
+
+mod widgets;
+
+pub const ATTRIBUTE_CONTENT_TYPE: &str = "attribute-content-type";
+
+#[repr(isize)]
+#[derive(Debug, PartialEq)]
+pub enum ContentType {
+    Table = 0
+}
 
 #[derive(MockComponent)]
 pub struct QueryResult {
-    component: tui_realm_stdlib::Table,
+    content_type: ContentType,
+    component: QueryResultWidget,
 }
 
 impl Default for QueryResult {
@@ -25,80 +36,66 @@ impl Default for QueryResult {
             );
 
         Self {
-            component: table
+            content_type: ContentType::Table,
+            component: QueryResultWidget::Table(table)
         }
     }
 }
 
 impl Component<Msg, AppEvent> for QueryResult {
     fn on(&mut self, ev: tuirealm::Event<AppEvent>) -> Option<Msg> {
-        match ev {
-            Event::Keyboard(KeyEvent { code: Key::Esc, .. }) => Some(Msg::ToConnectionsPage),
-            Event::Keyboard(KeyEvent { code: Key::Char('H') | Key::Left, ..}) => Some(Msg::ToDbObjectsWidget),
-            Event::Keyboard(KeyEvent { code: Key::Char('q'), ..}) => Some(Msg::ActivateEditor(EditorType::Query)),
-            Event::Keyboard(KeyEvent { code: Key::Char('j') | Key::Down, ..}) => {
-                self.component.states.incr_list_index(true);
-                Some(Msg::None)
+        let content_type = match self.query(Attribute::Custom(ATTRIBUTE_CONTENT_TYPE)) {
+            Some(val) => match val {
+                AttrValue::Number(content_type) => match content_type {
+                    0 => ContentType::Table,
+                    _ => return Some(Msg::None),
+                },
+                _ => return Some(Msg::None)
             },
-            Event::Keyboard(KeyEvent { code: Key::Char('k') | Key::Up, ..}) => {
-                self.component.states.decr_list_index(true);
-                Some(Msg::None)
-            },
-            Event::Keyboard(KeyEvent { code: Key::Char('/'), .. }) => Some(Msg::ActivateEditor(EditorType::Search)),
-            Event::Keyboard(KeyEvent { code: Key::Char('g'), .. }) => {
-                self.component.states.list_index_at_first();
-                Some(Msg::None)
-            },
-            Event::Keyboard(KeyEvent { code: Key::Char('G'), .. }) => {
-                self.component.states.list_index_at_last();
-                Some(Msg::None)
-            },
-            Event::Keyboard(KeyEvent { code: Key::Char('n'), ..}) => {
-                self.query(Attribute::Custom(APP_SEARCH_PATTERN))
-                    .and_then(|val| match val {
-                        AttrValue::String(pattern) => {
-                            let current_table = self.get_current_table();
+            //NOTE: Nothing to display here, so travel to db objects widgets
+            None => return Some(Msg::ToDbObjectsWidget)
+        };
 
-                            let start_index = self.component.states.list_index;
-                            self.component.states.incr_list_index(true);
-                            'searcher: while self.component.states.list_index != start_index {
-                                let row = current_table.get(self.component.states.list_index).unwrap();
-                                for item in row {
-                                    if item.contains(&pattern) {
-                                        break 'searcher;
-                                    }
-                                }
-                                self.component.states.incr_list_index(true);
-                            }
-                            None
-                        },
-                        _ => None
-                    }).unwrap_or(Some(Msg::None))
-            },
-            Event::Keyboard(KeyEvent { code: Key::Char('N'), ..}) => {
-                self.query(Attribute::Custom(APP_SEARCH_PATTERN))
-                    .and_then(|val| match val {
-                        AttrValue::String(pattern) => {
-                            let current_table = self.get_current_table();
+        let content = self.query(Attribute::Content);
+        let focus = self.query(Attribute::Focus);
 
-                            let start_index = self.component.states.list_index;
-                            self.component.states.decr_list_index(true);
-                            'searcher: while self.component.states.list_index != start_index {
-                                let row = current_table.get(self.component.states.list_index).unwrap();
-                                for item in row {
-                                    if item.contains(&pattern) {
-                                        break 'searcher;
-                                    }
-                                }
-                                self.component.states.decr_list_index(true);
-                            }
-                            None
-                        },
-                        _ => None
-                    }).unwrap_or(Some(Msg::None))
-            }
-            _ => Some(Msg::None)
+        if self.content_type != content_type {
+            self.component = match content_type {
+                ContentType::Table => {       
+                    let mut table = tui_realm_stdlib::Table::default()
+                        .title("Result", Alignment::Left)
+                        .highlighted_color(Color::Yellow)
+                        .highlighted_str("> ")
+                        .scroll(true)
+                        .rewind(true)
+                        .borders(
+                            Borders::default()
+                                .modifiers(BorderType::Rounded)
+                                .color(Color::Yellow)
+                        );
+                    if let Some(content) = content {
+                        table.attr(Attribute::Content, content);
+                    }
+                    if let Some(focus) = focus {
+                        table.attr(Attribute::Focus, focus);
+                    }
+                    QueryResultWidget::Table(table)
+                },
+            };
         }
+
+        let context = {
+            let mut res = vec![];
+            match self.query(Attribute::Custom(APP_SEARCH_PATTERN)) {
+                Some(val) => match val {
+                    AttrValue::String(pattern) => res.push(WidgetContext::SearchPattern(pattern)),
+                    _ => {},
+                },
+                None => (),
+            };
+            res
+        };
+        self.component.react_on_event(context, ev)
     }
 }
 
@@ -124,18 +121,6 @@ impl QueryResult {
             }
         }
         table_builder.build()
-    }
-
-    pub fn get_current_table(&self) -> Vec<Vec<String>> {
-        self.component.query(Attribute::Content).and_then(|val| {
-            match val {
-                AttrValue::Table(table) => {
-                    let result: Vec<Vec<String>> = table.iter().map(|row| row.iter().map(|elem| elem.content.clone()).collect()).collect();
-                    Some(result)
-                },
-                _ => None
-            }
-        }).unwrap_or(vec![])
     }
 }
 

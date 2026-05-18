@@ -1,7 +1,7 @@
 use std::{cmp::min, collections::HashMap, time::Duration, usize};
 use ratatui::layout::{Constraint, Direction, Rect};
 use tuirealm::{props::Layout, terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge}, Application, AttrValue, Attribute, EventListenerCfg, PollStrategy, Update};
-use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, editor_popup::EditorPopup, query_result::QueryResult}};
+use crate::{config::{Config, Connection}, dbclient::{dummy::DummyFetcher, fetcher::{FetchRequest, Fetcher}, query_builder::QueryElement, redis::{RedisConfig, RedisFetcher}}, ui3::{connections_list::ConnectionsListComponent, db_objects::DbObjects, editor_popup::EditorPopup, query_result::{ATTRIBUTE_CONTENT_TYPE, ContentType, QueryResult}}};
 
 use super::{AppEvent, Id, Msg, Page, APP_SEARCH_PATTERN};
 
@@ -155,6 +155,13 @@ impl Model<CrosstermTerminalAdapter> {
                     &Id::QueryResult,
                     Attribute::Content,
                     AttrValue::Table(QueryResult::build_result_table(result))).is_ok()
+            );
+            assert!(
+                self.app.attr(
+                    &Id::QueryResult,
+                    Attribute::Custom(ATTRIBUTE_CONTENT_TYPE),
+                    AttrValue::Number(ContentType::Table as isize)
+                ).is_ok()
             );
         }
         Some(Msg::FetchDbObjects)
