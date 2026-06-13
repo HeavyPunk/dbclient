@@ -3,6 +3,7 @@ use crate::{
     dbclient::{
         dummy::DummyFetcher,
         fetcher::{FetchRequest, Fetcher},
+        postgresql::{PostgresConfig, PostgresFetcher},
         query_builder::QueryElement,
         redis::{RedisConfig, RedisFetcher},
     },
@@ -294,7 +295,11 @@ impl Model<CrosstermTerminalAdapter> {
                     uri: connection.connection_string.clone(),
                 },
             }),
-            crate::config::ConnectionType::Postgres => Box::new(DummyFetcher::new()),
+            crate::config::ConnectionType::Postgres => Box::new(PostgresFetcher {
+                config: PostgresConfig {
+                    uri: connection.connection_string.clone(),
+                },
+            }),
             crate::config::ConnectionType::MySql => Box::new(DummyFetcher::new()),
         };
 

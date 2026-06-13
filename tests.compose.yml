@@ -6,6 +6,16 @@ services:
     networks:
       - test_net
 
+  postgres:
+    image: postgres:18.4-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432:5432
+    networks:
+      - test_net
+
 networks:
   test_net:
     driver: bridge

@@ -1,5 +1,6 @@
 //#[cfg(feature = "redis")]
 pub mod dummy;
+pub mod postgresql;
 pub mod redis;
 
 pub mod query_builder;
@@ -27,10 +28,12 @@ pub(crate) mod fetcher {
         pub limit: usize,
     }
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug)]
     pub enum FetcherError {
         InvalidQuery,
+        MappingError(String),
         RedisError(redis::RedisError),
+        PostgresError(postgres::Error),
     }
 
     impl From<redis::RedisError> for FetcherError {
@@ -47,6 +50,10 @@ pub(crate) mod fetcher {
     impl FetchResult {
         pub fn none() -> FetchResult {
             FetchResult { table: None }
+        }
+
+        pub fn new(items: (Vec<IndexColumn>, HashMap<String, Vec<String>>)) -> FetchResult {
+            FetchResult { table: Some(items) }
         }
 
         pub fn single<T>(item: &T) -> FetchResult
