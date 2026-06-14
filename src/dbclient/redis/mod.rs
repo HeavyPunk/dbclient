@@ -161,15 +161,19 @@ fn get_index_type(
     let mut type_cmd = redis::cmd("TYPE");
     let type_cmd = type_cmd.arg(index);
     let type_res = type_cmd.query::<FetchResult>(&mut connection)?;
-    match type_res.table {
-        Some(table) => match table.1.iter().last() {
-            Some((_, column)) => match column.first() {
-                Some(val) => val.as_str().try_into(),
+    if let FetchResult::Table(table) = type_res {
+        match table {
+            Some(table) => match table.1.iter().last() {
+                Some((_, column)) => match column.first() {
+                    Some(val) => val.as_str().try_into(),
+                    None => Err(FetcherError::InvalidQuery),
+                },
                 None => Err(FetcherError::InvalidQuery),
             },
             None => Err(FetcherError::InvalidQuery),
-        },
-        None => Err(FetcherError::InvalidQuery),
+        }
+    } else {
+        Err(FetcherError::InvalidQuery)
     }
 }
 

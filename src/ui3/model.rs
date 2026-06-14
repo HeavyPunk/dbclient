@@ -2,7 +2,7 @@ use crate::{
     config::{Config, Connection},
     dbclient::{
         dummy::DummyFetcher,
-        fetcher::{FetchRequest, Fetcher},
+        fetcher::{FetchRequest, FetchResult, Fetcher},
         postgresql::{PostgresConfig, PostgresFetcher},
         query_builder::QueryElement,
         redis::{RedisConfig, RedisFetcher},
@@ -271,18 +271,20 @@ impl Model<CrosstermTerminalAdapter> {
     fn reload_db_objects(&mut self) -> Option<Msg> {
         if let Some(ref mut fetcher) = self.fetcher {
             let result = fetcher.fetch_db_objects().unwrap();
-            let result = result.table.unwrap_or((vec![], HashMap::default()));
-            let list = result.1.iter().last();
-            assert!(self
-                .app
-                .attr(
-                    &Id::DbObjects,
-                    Attribute::Content,
-                    AttrValue::Table(DbObjects::build_objects_list(
-                        list.unwrap_or((&"".to_string(), &vec![])).1
-                    ))
-                )
-                .is_ok());
+            if let FetchResult::Table(table) = result {
+                let result = table.unwrap_or((vec![], HashMap::default()));
+                let list = result.1.iter().last();
+                assert!(self
+                    .app
+                    .attr(
+                        &Id::DbObjects,
+                        Attribute::Content,
+                        AttrValue::Table(DbObjects::build_objects_list(
+                            list.unwrap_or((&"".to_string(), &vec![])).1
+                        ))
+                    )
+                    .is_ok());
+            }
         }
         Some(Msg::None)
     }

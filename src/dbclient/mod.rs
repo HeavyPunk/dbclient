@@ -13,8 +13,9 @@ pub(crate) mod fetcher {
     type IndexColumn = String;
 
     #[derive(Debug, PartialEq, Clone)]
-    pub struct FetchResult {
-        pub table: Option<(Vec<IndexColumn>, HashMap<String, Vec<String>>)>,
+    pub enum FetchResult {
+        None,
+        Table(Option<(Vec<IndexColumn>, HashMap<String, Vec<String>>)>),
     }
 
     #[derive(Debug, PartialEq, Clone)]
@@ -49,11 +50,11 @@ pub(crate) mod fetcher {
 
     impl FetchResult {
         pub fn none() -> FetchResult {
-            FetchResult { table: None }
+            FetchResult::None
         }
 
         pub fn new(items: (Vec<IndexColumn>, HashMap<String, Vec<String>>)) -> FetchResult {
-            FetchResult { table: Some(items) }
+            FetchResult::Table(Some(items))
         }
 
         pub fn single<T>(item: &T) -> FetchResult
@@ -64,9 +65,7 @@ pub(crate) mod fetcher {
             let index_column = "result".to_string();
             table.insert(index_column.clone(), vec![item.to_string()]);
 
-            FetchResult {
-                table: Some((vec![index_column], table)),
-            }
+            FetchResult::Table(Some((vec![index_column], table)))
         }
 
         pub fn multiple<T>(items: &Vec<T>) -> FetchResult
@@ -79,9 +78,7 @@ pub(crate) mod fetcher {
                 index_column.clone(),
                 items.iter().map(|item| item.to_string()).collect(),
             );
-            FetchResult {
-                table: Some((vec![index_column], table)),
-            }
+            FetchResult::Table(Some((vec![index_column], table)))
         }
 
         pub fn key_value(items: HashMap<String, String>) -> FetchResult {
@@ -91,50 +88,60 @@ pub(crate) mod fetcher {
             let index_column = "keys".to_string();
             table.insert(index_column.clone(), keys);
             table.insert("values".to_string(), values);
-            FetchResult {
-                table: Some((vec![index_column], table)),
-            }
+            FetchResult::Table(Some((vec![index_column], table)))
         }
 
         pub fn merge(result1: &FetchResult, result2: &FetchResult) -> FetchResult {
-            let table = match (result1.table.clone(), result2.table.clone()) {
-                (None, None) => None,
-                (None, Some(t)) => Some(t),
-                (Some(t), None) => Some(t),
-                (Some(t1), Some(t2)) => {
-                    let mut merged_table = t1.clone();
-                    for (key, value) in t2.1 {
-                        merged_table
-                            .1
-                            .entry(key)
-                            .or_insert_with(Vec::new)
-                            .extend(value);
+            let table = match (result1.clone(), result2.clone()) {
+                (FetchResult::None, _) | (_, FetchResult::None) => None,
+                (FetchResult::Table(table1), FetchResult::Table(table2)) => {
+                    match (table1, table2) {
+                        (None, None) => None,
+                        (None, Some(t)) => Some(t),
+                        (Some(t), None) => Some(t),
+                        (Some(t1), Some(t2)) => {
+                            let mut merged_table = t1.clone();
+                            for (key, value) in t2.1 {
+                                merged_table
+                                    .1
+                                    .entry(key)
+                                    .or_insert_with(Vec::new)
+                                    .extend(value);
+                            }
+                            Some(merged_table)
+                        }
                     }
-                    Some(merged_table)
                 }
             };
-            FetchResult { table }
+            FetchResult::Table(table)
         }
 
         pub fn join(result1: &FetchResult, result2: &FetchResult) -> FetchResult {
-            let table = match (&result1.table, &result2.table) {
-                (None, None) => None,
-                (None, Some(t)) => Some((t.0.clone(), t.1.clone())),
-                (Some(t), None) => Some((t.0.clone(), t.1.clone())),
-                (Some(t1), Some(t2)) => {
-                    let mut merged_table: HashMap<String, Vec<String>> = HashMap::new();
-                    let mut index_keys = t1.0.clone();
-                    index_keys.extend(t2.0.clone());
-                    for (key, value) in &t1.1 {
-                        merged_table.insert(format!("{}_1", key).to_string(), value.to_vec());
+            let table = match (&result1, &result2) {
+                (FetchResult::None, _) | (_, FetchResult::None) => None,
+                (FetchResult::Table(table1), FetchResult::Table(table2)) => {
+                    match (table1, table2) {
+                        (None, None) => None,
+                        (None, Some(t)) => Some((t.0.clone(), t.1.clone())),
+                        (Some(t), None) => Some((t.0.clone(), t.1.clone())),
+                        (Some(t1), Some(t2)) => {
+                            let mut merged_table: HashMap<String, Vec<String>> = HashMap::new();
+                            let mut index_keys = t1.0.clone();
+                            index_keys.extend(t2.0.clone());
+                            for (key, value) in &t1.1 {
+                                merged_table
+                                    .insert(format!("{}_1", key).to_string(), value.to_vec());
+                            }
+                            for (key, value) in &t2.1 {
+                                merged_table
+                                    .insert(format!("{}_2", key).to_string(), value.to_vec());
+                            }
+                            Some((index_keys, merged_table))
+                        }
                     }
-                    for (key, value) in &t2.1 {
-                        merged_table.insert(format!("{}_2", key).to_string(), value.to_vec());
-                    }
-                    Some((index_keys, merged_table))
                 }
             };
-            FetchResult { table: table }
+            FetchResult::Table(table)
         }
     }
 }

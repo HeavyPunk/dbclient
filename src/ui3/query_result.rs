@@ -107,33 +107,37 @@ impl Component<Msg, AppEvent> for QueryResult {
 
 impl QueryResult {
     pub fn build_result_table(result: FetchResult) -> Table {
-        if result.table.is_none() {
-            return vec![];
-        }
-        let mut table_builder = TableBuilder::default();
-        let table = result.table.unwrap();
-
-        let headers: Vec<TextSpan> = table
-            .1
-            .keys()
-            .cloned()
-            .map(|key| TextSpan::new(key))
-            .collect();
-        for header in headers {
-            table_builder.add_col(header);
-        }
-
-        let max_len = table.1.values().map(|v| v.len()).max().unwrap_or(0);
-        for row_index in 0..max_len {
-            table_builder.add_row();
-            for column in table.1.values() {
-                let val = column
-                    .get(row_index)
-                    .cloned()
-                    .unwrap_or_else(|| "".to_string());
-                table_builder.add_col(TextSpan::new(val));
+        if let FetchResult::Table(table) = result {
+            if table.is_none() {
+                return vec![];
             }
+            let mut table_builder = TableBuilder::default();
+            let table = table.unwrap();
+
+            let headers: Vec<TextSpan> = table
+                .1
+                .keys()
+                .cloned()
+                .map(|key| TextSpan::new(key))
+                .collect();
+            for header in headers {
+                table_builder.add_col(header);
+            }
+
+            let max_len = table.1.values().map(|v| v.len()).max().unwrap_or(0);
+            for row_index in 0..max_len {
+                table_builder.add_row();
+                for column in table.1.values() {
+                    let val = column
+                        .get(row_index)
+                        .cloned()
+                        .unwrap_or_else(|| "".to_string());
+                    table_builder.add_col(TextSpan::new(val));
+                }
+            }
+            table_builder.build()
+        } else {
+            vec![]
         }
-        table_builder.build()
     }
 }
