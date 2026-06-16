@@ -10,8 +10,9 @@ use crate::{
     ui3::{
         connections_list::ConnectionsListComponent,
         db_objects::DbObjects,
-        editor_popup::EditorPopup,
-        query_result::{ContentType, QueryResult, ATTRIBUTE_CONTENT_TYPE},
+        query_result::{
+            widgets::editor_popup::EditorPopup, ContentType, QueryResult, ATTRIBUTE_CONTENT_TYPE,
+        },
     },
 };
 use ratatui::layout::{Constraint, Direction, Rect};
@@ -33,12 +34,16 @@ where
     pub redraw: bool,
     pub terminal: TerminalBridge<TermAdapter>,
     pub selected_page: Page,
+    pub selected_db_object: Option<String>,
 
     pub connections: Vec<Connection>,
 
     pub fetcher: Option<Box<dyn Fetcher>>,
     pub query_page_selected_widget: Id,
     pub show_editor: bool,
+
+    pub current_fetch_result: Option<FetchResult>,
+    pub current_db_objects: Option<FetchResult>,
 }
 
 impl Model<CrosstermTerminalAdapter> {
@@ -80,9 +85,12 @@ impl Model<CrosstermTerminalAdapter> {
             terminal,
             connections: config.connections.clone(),
             selected_page: Page::Connections,
+            selected_db_object: None,
             fetcher: None,
             query_page_selected_widget: Id::DbObjects,
             show_editor: false,
+            current_fetch_result: None,
+            current_db_objects: None,
         }
     }
 
@@ -180,7 +188,7 @@ impl Model<CrosstermTerminalAdapter> {
                 .attr(
                     &Id::QueryResult,
                     Attribute::Content,
-                    AttrValue::Table(QueryResult::build_result_table(result))
+                    AttrValue::Table(QueryResult::build_result_table(&result))
                 )
                 .is_ok());
             assert!(self
@@ -191,11 +199,13 @@ impl Model<CrosstermTerminalAdapter> {
                     AttrValue::Number(ContentType::Table as isize)
                 )
                 .is_ok());
+            self.current_fetch_result = Some(result);
         }
         Some(Msg::FetchDbObjects)
     }
 
     fn fetch_db_object(&mut self, object: String) -> Option<Msg> {
+        self.selected_db_object = Some(object.clone());
         let query = FetchRequest {
             query: vec![QueryElement::ListAllItemsFrom(object)],
             limit: usize::MAX,
@@ -209,6 +219,18 @@ impl Model<CrosstermTerminalAdapter> {
             limit: usize::MAX,
         };
         return Some(Msg::ExecuteQuery(query));
+    }
+
+    fn add_record_to_db_object(&mut self, fields: HashMap<String, String>) -> Option<Msg> {
+        if let Some(db_object) = &self.selected_db_object {
+            let query = FetchRequest {
+                query: vec![QueryElement::AddRecordToDbObject(db_object.clone(), fields)],
+                limit: usize::MAX,
+            };
+            return Some(Msg::ExecuteQuery(query));
+        } else {
+            return Some(Msg::None);
+        }
     }
 
     fn execute_custom_query(&mut self, query: String) -> Option<Msg> {
@@ -271,8 +293,12 @@ impl Model<CrosstermTerminalAdapter> {
     fn reload_db_objects(&mut self) -> Option<Msg> {
         if let Some(ref mut fetcher) = self.fetcher {
             let result = fetcher.fetch_db_objects().unwrap();
-            if let FetchResult::Table(table) = result {
-                let result = table.unwrap_or((vec![], HashMap::default()));
+            self.current_db_objects = Some(result);
+            if let Some(FetchResult::Table(table)) = &self.current_db_objects {
+                let result = match table {
+                    Some(x) => x,
+                    None => &(vec![], HashMap::default()),
+                };
                 let list = result.1.iter().last();
                 assert!(self
                     .app
@@ -339,6 +365,8 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                     self.add_db_object(path, object_type, name)
                 }
 
+                Msg::AddRecordToDbObject(fields) => self.add_record_to_db_object(fields),
+
                 Msg::ExecuteCustomQuery(query) => self.execute_custom_query(query),
 
                 Msg::SearchPattern(pattern) => self.search_pattern(pattern),
@@ -356,17 +384,19 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                     assert!(self.app.active(&Id::QueryResult).is_ok());
                     None
                 }
-                Msg::ActivateEditor(widget_kind) => {
+                Msg::ActivateEditor(caller, widget_kind) => {
                     self.show_editor = true;
-                    assert!(self
-                        .app
-                        .mount(
-                            Id::QueryLine,
-                            Box::new(EditorPopup::new(widget_kind)),
-                            vec![]
-                        )
-                        .is_ok());
-                    assert!(self.app.active(&Id::QueryLine).is_ok());
+                    if let Some(fetch_res) = &self.current_fetch_result {
+                        assert!(self
+                            .app
+                            .mount(
+                                Id::QueryLine,
+                                Box::new(EditorPopup::new(fetch_res, widget_kind, caller)),
+                                vec![]
+                            )
+                            .is_ok());
+                        assert!(self.app.active(&Id::QueryLine).is_ok());
+                    }
                     None
                 }
                 Msg::DiactivateEditor => {
@@ -378,10 +408,24 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                     None
                 }
 
-                Msg::EditorResult(editor_type, editors) => {
+                Msg::EditorResult(editor_type, caller, editors) => {
                     if self.app.mounted(&Id::QueryLine) {
                         assert!(self.app.umount(&Id::QueryLine).is_ok());
                     }
+
+                    match caller {
+                        Id::QueryResult => match editor_type {
+                            super::EditorType::AddRecord => {
+                                let res: HashMap<String, String> = editors
+                                    .iter()
+                                    .map(|pair| (pair.0.clone(), pair.1.join("\n")))
+                                    .collect();
+                                return Some(Msg::AddRecordToDbObject(res));
+                            }
+                            _ => return Some(Msg::None),
+                        },
+                        _ => (),
+                    };
 
                     match editor_type {
                         super::EditorType::Search => {
@@ -397,6 +441,13 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                             let obj_type = editors.get("type").unwrap_or(&vec![]).join("\n");
                             let name = editors.get("name").unwrap_or(&vec![]).join("\n");
                             Some(Msg::AddDbObject(root, obj_type, name))
+                        }
+                        super::EditorType::AddRecord => {
+                            let res: HashMap<String, String> = editors
+                                .iter()
+                                .map(|pair| (pair.0.clone(), pair.1.join("\n")))
+                                .collect();
+                            Some(Msg::AddRecordToDbObject(res))
                         }
                     }
                 }

@@ -73,6 +73,19 @@ ORDER BY table_schema, table_name;
                     //TODO: need to extend database object context to create a table
                     unimplemented!()
                 }
+                QueryElement::AddRecordToDbObject(db_object, fields) => {
+                    let (mut keys_vec, mut values_vec) = (vec![], vec![]);
+                    for pair in fields {
+                        keys_vec.push(pair.0.clone());
+                        values_vec.push(pair.1.clone());
+                    }
+                    let keys = keys_vec.join(",");
+                    let values = values_vec.join(",");
+
+                    let query = format!("INSERT INTO {db_object} ({keys}) VALUES ({values})");
+                    client.execute(&query, &[])?;
+                    Ok(FetchResult::none())
+                }
             },
             None => Err(FetcherError::InvalidQuery),
         }

@@ -118,6 +118,7 @@ impl Fetcher for RedisFetcher {
                     };
                     Ok(res)
                 }
+                QueryElement::AddRecordToDbObject(_, _) => unimplemented!(),
             },
             None => Err(FetcherError::InvalidQuery),
         }

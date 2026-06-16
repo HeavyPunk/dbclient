@@ -244,7 +244,7 @@ impl EditorPopupWidget for EditorInput {
         }
     }
 
-    fn get_editor_type(&self) -> String {
-        self.editor_type.to_string()
-    }
+    // fn get_editor_type(&self) -> &'static str {
+    //     self.editor_type
+    // }
 }

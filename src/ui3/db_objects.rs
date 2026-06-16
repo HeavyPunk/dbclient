@@ -42,11 +42,17 @@ impl Component<Msg, AppEvent> for DbObjects {
             Event::Keyboard(KeyEvent {
                 code: Key::Char('a'),
                 ..
-            }) => Some(Msg::ActivateEditor(EditorType::AddDbObject)),
+            }) => Some(Msg::ActivateEditor(
+                super::Id::DbObjects,
+                EditorType::AddDbObject,
+            )),
             Event::Keyboard(KeyEvent {
                 code: Key::Char('/'),
                 ..
-            }) => Some(Msg::ActivateEditor(EditorType::Search)),
+            }) => Some(Msg::ActivateEditor(
+                super::Id::DbObjects,
+                EditorType::Search,
+            )),
             Event::Keyboard(KeyEvent {
                 code: Key::Char('n'),
                 ..

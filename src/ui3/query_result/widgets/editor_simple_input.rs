@@ -7,22 +7,22 @@ use tuirealm::{
     AttrValue, Attribute, Component, Event, MockComponent,
 };
 
-use crate::ui3::{editor_popup::EditorPopupWidget, AppEvent, Msg};
+use crate::ui3::{query_result::widgets::editor_popup::EditorPopupWidget, AppEvent, Msg};
 
 pub struct EditorSimpleInput {
     component: Input,
-    pub editor_type: &'static str,
+    pub editor_type: String,
 }
 
 impl EditorSimpleInput {
-    pub fn new(title: &'static str, editor_type: &'static str) -> Self {
+    pub fn new(title: impl Into<String>, editor_type: impl Into<String>) -> Self {
         Self {
             component: Input::default().title(title, Alignment::Left).borders(
                 tuirealm::props::Borders::default()
                     .modifiers(BorderType::Rounded)
                     .color(Color::Yellow),
             ),
-            editor_type,
+            editor_type: editor_type.into(),
         }
     }
 }
@@ -55,7 +55,7 @@ impl EditorPopupWidget for EditorSimpleInput {
     }
 
     fn get_editor_type(&self) -> String {
-        self.editor_type.to_string()
+        self.editor_type.clone()
     }
 }
 
