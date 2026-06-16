@@ -1,3 +1,4 @@
+use dbclient::Field;
 use ratatui::{layout::Alignment, style::Color};
 use tui_realm_stdlib::Input;
 use tuirealm::{
@@ -50,8 +51,8 @@ impl Component<Msg, AppEvent> for EditorSimpleInput {
 }
 
 impl EditorPopupWidget for EditorSimpleInput {
-    fn get_content(&self) -> Vec<String> {
-        vec![self.component.states.get_value()]
+    fn get_content(&self) -> Option<Field> {
+        Some(Field::String(self.component.states.get_value()))
     }
 
     fn get_editor_type(&self) -> String {

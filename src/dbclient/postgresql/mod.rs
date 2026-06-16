@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
+use dbclient::{Field, SQLRepresentation};
 use postgres::{Column, NoTls, Row};
 
 use crate::dbclient::{
@@ -74,10 +75,14 @@ ORDER BY table_schema, table_name;
                     unimplemented!()
                 }
                 QueryElement::AddRecordToDbObject(db_object, fields) => {
-                    let (mut keys_vec, mut values_vec) = (vec![], vec![]);
+                    let mut keys_vec = vec![];
+                    let mut values_vec: Vec<SQLRepresentation> = vec![];
                     for pair in fields {
-                        keys_vec.push(pair.0.clone());
-                        values_vec.push(pair.1.clone());
+                        let (key, val) = (pair.0, pair.1);
+                        if let Some(val) = val {
+                            keys_vec.push(key.clone());
+                            values_vec.push(val.clone().into());
+                        }
                     }
                     let keys = keys_vec.join(",");
                     let values = values_vec.join(",");

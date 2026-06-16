@@ -15,8 +15,9 @@ use crate::{
         },
     },
 };
+use dbclient::Field;
 use ratatui::layout::{Constraint, Direction, Rect};
-use std::{cmp::min, collections::HashMap, time::Duration, usize};
+use std::{cmp::min, collections::HashMap, str::FromStr, time::Duration, usize};
 use tuirealm::{
     props::Layout,
     terminal::{CrosstermTerminalAdapter, TerminalAdapter, TerminalBridge},
@@ -221,7 +222,7 @@ impl Model<CrosstermTerminalAdapter> {
         return Some(Msg::ExecuteQuery(query));
     }
 
-    fn add_record_to_db_object(&mut self, fields: HashMap<String, String>) -> Option<Msg> {
+    fn add_record_to_db_object(&mut self, fields: HashMap<String, Option<Field>>) -> Option<Msg> {
         if let Some(db_object) = &self.selected_db_object {
             let query = FetchRequest {
                 query: vec![QueryElement::AddRecordToDbObject(db_object.clone(), fields)],
@@ -416,9 +417,9 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                     match caller {
                         Id::QueryResult => match editor_type {
                             super::EditorType::AddRecord => {
-                                let res: HashMap<String, String> = editors
+                                let res: HashMap<String, Option<Field>> = editors
                                     .iter()
-                                    .map(|pair| (pair.0.clone(), pair.1.join("\n")))
+                                    .map(|pair| (pair.0.clone(), pair.1.clone()))
                                     .collect();
                                 return Some(Msg::AddRecordToDbObject(res));
                             }
@@ -429,23 +430,43 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
 
                     match editor_type {
                         super::EditorType::Search => {
-                            let pattern = editors.get("search").unwrap_or(&vec![]).join("\n");
+                            let pattern = match editors.get("search") {
+                                Some(Some(Field::String(str))) => str.clone(),
+                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                _ => "".to_string(),
+                            };
                             Some(Msg::SearchPattern(pattern))
                         }
                         super::EditorType::Query => {
-                            let query = editors.get("query").unwrap_or(&vec![]).join("\n");
+                            let query = match editors.get("query") {
+                                Some(Some(Field::String(str))) => str.clone(),
+                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                _ => "".to_string(),
+                            };
                             Some(Msg::ExecuteCustomQuery(query))
                         }
                         super::EditorType::AddDbObject => {
-                            let root = editors.get("root").unwrap_or(&vec![]).join("\n");
-                            let obj_type = editors.get("type").unwrap_or(&vec![]).join("\n");
-                            let name = editors.get("name").unwrap_or(&vec![]).join("\n");
+                            let root = match editors.get("root") {
+                                Some(Some(Field::String(str))) => str.clone(),
+                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                _ => "".to_string(),
+                            };
+                            let obj_type = match editors.get("type") {
+                                Some(Some(Field::String(str))) => str.clone(),
+                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                _ => "".to_string(),
+                            };
+                            let name = match editors.get("name") {
+                                Some(Some(Field::String(str))) => str.clone(),
+                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                _ => "".to_string(),
+                            };
                             Some(Msg::AddDbObject(root, obj_type, name))
                         }
                         super::EditorType::AddRecord => {
-                            let res: HashMap<String, String> = editors
+                            let res: HashMap<String, Option<Field>> = editors
                                 .iter()
-                                .map(|pair| (pair.0.clone(), pair.1.join("\n")))
+                                .map(|pair| (pair.0.clone(), pair.1.clone()))
                                 .collect();
                             Some(Msg::AddRecordToDbObject(res))
                         }

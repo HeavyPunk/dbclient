@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use dbclient::Field;
+
 use crate::dbclient::fetcher::{FetchRequest, FetchResult};
 
 pub mod connections_list;
@@ -20,12 +22,12 @@ pub enum Msg {
     FetchDbObjects,
     FetchDbObject(String),
     AddDbObject(String, String, String),
-    AddRecordToDbObject(HashMap<String, String>),
+    AddRecordToDbObject(HashMap<String, Option<Field>>),
     ExecuteCustomQuery(String),
     ExecuteQuery(FetchRequest),
     EditorAccept,
     EditorPopupNext,
-    EditorResult(EditorType, Id, HashMap<String, Vec<String>>),
+    EditorResult(EditorType, Id, HashMap<String, Option<Field>>),
     SearchPattern(String),
     ToQueryResultWidget,
     ToDbObjectsWidget,

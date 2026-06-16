@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use dbclient::Field;
 use ratatui::{
     layout::{Constraint, Direction as RatatuiDirection, Layout},
     style::Color,
@@ -20,7 +21,7 @@ use crate::{
 use super::{AppEvent, Msg};
 
 pub trait EditorPopupWidget: Component<Msg, AppEvent> {
-    fn get_content(&self) -> Vec<String>;
+    fn get_content(&self) -> Option<Field>;
     fn get_editor_type(&self) -> String;
 }
 
