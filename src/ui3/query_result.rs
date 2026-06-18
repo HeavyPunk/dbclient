@@ -128,8 +128,15 @@ impl QueryResult {
                     let val = column
                         .get(row_index)
                         .cloned()
-                        .unwrap_or_else(|| "".to_string());
-                    table_builder.add_col(TextSpan::new(val));
+                        .unwrap_or_else(|| None);
+                    table_builder.add_col(
+                        TextSpan::new(
+                            val.map_or(
+                                "".to_string(),
+                                |v| v.as_ui_value()
+                            )
+                        )
+                    );
                 }
             }
             table_builder.build()

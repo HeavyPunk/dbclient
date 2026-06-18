@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use dbclient::Field;
 use redis::{Cmd, Commands, Connection, FromRedisValue, RedisError};
 
 use super::{
@@ -82,6 +83,12 @@ impl Fetcher for RedisFetcher {
                         }
                         RedisType::Hash => {
                             let res: HashMap<String, String> = connection.hgetall(index)?;
+                            let res: HashMap<Option<Field>, Option<Field>> = res
+                                .iter()
+                                .map(|pair| (
+                                    Some(Field::String(pair.0.clone())),
+                                    Some(Field::String(pair.1.clone()))
+                                )).collect();
                             FetchResult::key_value(res)
                         }
                         RedisType::Stream => FetchResult::none(),
@@ -166,8 +173,8 @@ fn get_index_type(
         match table {
             Some(table) => match table.1.iter().last() {
                 Some((_, column)) => match column.first() {
-                    Some(val) => val.as_str().try_into(),
-                    None => Err(FetcherError::InvalidQuery),
+                    Some(Some(Field::String(val))) => val.as_str().try_into(),
+                    _ => Err(FetcherError::InvalidQuery),
                 },
                 None => Err(FetcherError::InvalidQuery),
             },

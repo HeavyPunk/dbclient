@@ -1,3 +1,4 @@
+use dbclient::Field;
 use ratatui::{layout::Alignment, style::Color};
 use tui_realm_stdlib::List;
 use tuirealm::{
@@ -149,15 +150,17 @@ impl Component<Msg, AppEvent> for DbObjects {
 }
 
 impl DbObjects {
-    pub fn build_objects_list(connections: &Vec<String>) -> Table {
+    pub fn build_objects_list(connections: &Vec<Option<Field>>) -> Table {
         if connections.is_empty() {
             return vec![];
         }
         let mut table = TableBuilder::default();
         connections.iter().enumerate().for_each(|(index, obj)| {
-            let row = table.add_col(TextSpan::from(obj).fg(Color::Blue));
-            if index < connections.len() - 1 {
-                row.add_row();
+            if let Some(obj) = obj {
+                let row = table.add_col(TextSpan::from(obj.as_ui_value()).fg(Color::Blue));
+                if index < connections.len() - 1 {
+                    row.add_row();
+                }
             }
         });
         table.build()
