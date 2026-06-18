@@ -128,14 +128,9 @@ impl QueryResult {
                     let val = column
                         .get(row_index)
                         .cloned()
-                        .unwrap_or_else(|| None);
+                        .unwrap();
                     table_builder.add_col(
-                        TextSpan::new(
-                            val.map_or(
-                                "".to_string(),
-                                |v| v.as_ui_value()
-                            )
-                        )
+                        TextSpan::new(val.as_ui_value())
                     );
                 }
             }

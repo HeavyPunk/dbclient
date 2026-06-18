@@ -231,19 +231,19 @@ impl MockComponent for EditorInput {
 }
 
 impl EditorPopupWidget for EditorInput {
-    fn get_content(&self) -> Option<Field> {
+    fn get_content(&self) -> Field {
         match self.component.state() {
-            tuirealm::State::One(text_val) => Some(Field::StringContainer(
+            tuirealm::State::One(text_val) => Field::StringContainer(Some(
                 text_val
                     .unwrap_string()
                     .lines()
                     .map(|s| s.to_string())
                     .collect(),
             )),
-            tuirealm::State::Vec(lines) => Some(Field::StringContainer(
+            tuirealm::State::Vec(lines) => Field::StringContainer(Some(
                 lines.iter().map(|v| v.clone().unwrap_string()).collect(),
             )),
-            _ => None,
+            _ => Field::String(None),
         }
     }
 

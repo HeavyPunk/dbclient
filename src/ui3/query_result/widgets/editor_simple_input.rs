@@ -12,11 +12,12 @@ use crate::ui3::{query_result::widgets::editor_popup::EditorPopupWidget, AppEven
 
 pub struct EditorSimpleInput {
     component: Input,
+    field: Field,
     pub editor_type: String,
 }
 
 impl EditorSimpleInput {
-    pub fn new(title: impl Into<String>, editor_type: impl Into<String>) -> Self {
+    pub fn new(title: impl Into<String>, editor_type: impl Into<String>, field: Field) -> Self {
         Self {
             component: Input::default().title(title, Alignment::Left).borders(
                 tuirealm::props::Borders::default()
@@ -24,6 +25,7 @@ impl EditorSimpleInput {
                     .color(Color::Yellow),
             ),
             editor_type: editor_type.into(),
+            field: field,
         }
     }
 }
@@ -51,8 +53,13 @@ impl Component<Msg, AppEvent> for EditorSimpleInput {
 }
 
 impl EditorPopupWidget for EditorSimpleInput {
-    fn get_content(&self) -> Option<Field> {
-        Some(Field::String(self.component.states.get_value()))
+    fn get_content(&self) -> Field {
+        let val = self.component.states.get_value();
+        if val != "" {
+            Field::String(Some(self.component.states.get_value()))
+        } else {
+            Field::String(None)
+        }
     }
 
     fn get_editor_type(&self) -> String {

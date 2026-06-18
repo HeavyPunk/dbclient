@@ -51,8 +51,8 @@ impl Component<Msg, AppEvent> for EditorSimpleInput {
 }
 
 impl EditorPopupWidget for EditorSimpleInput {
-    fn get_content(&self) -> Option<Field> {
-        Some(Field::String(self.component.states.get_value()))
+    fn get_content(&self) -> Field {
+        Field::String(Some(self.component.states.get_value()))
     }
 
     fn get_editor_type(&self) -> String {

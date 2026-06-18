@@ -2,44 +2,124 @@ use chrono::{DateTime, Utc};
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Field {
-    String(String),
-    StringContainer(Vec<String>),
-    Int8(i8),
-    Int16(i16),
-    Int32(i32),
-    Int64(i64),
-    Bool(bool),
-    Time(DateTime<Utc>),
+    String(Option<String>),
+    StringContainer(Option<Vec<String>>),
+    Int8(Option<i8>),
+    Int16(Option<i16>),
+    Int32(Option<i32>),
+    Int64(Option<i64>),
+    Bool(Option<bool>),
+    Time(Option<DateTime<Utc>>),
 }
 
 impl Field {
     pub fn as_sql_value(&self) -> String {
         match self {
-            Field::String(str) => format!("'{str}'"),
+            Field::String(str) => {
+                match str {
+                    Some(str) => format!("'{str}'"),
+                    None => "".into()
+                }
+            },
             Field::StringContainer(items) => {
-                let str = items.join("\n");
-                format!("'{str}'")
+                match items {
+                    Some(items) => {
+                        let str = items.join("\n");
+                        format!("'{str}'")
+                    },
+                    None => "".into()
+                }
             }
-            Field::Int8(i) => format!("{i}"),
-            Field::Int16(i) => format!("{i}"),
-            Field::Int32(i) => format!("{i}"),
-            Field::Int64(i) => format!("{i}"),
-            Field::Bool(b) => format!("{b}"),
-            Field::Time(t) => format!("{}", t.to_rfc2822()),
+            Field::Int8(i) => {
+                match i {
+                    Some(i) => format!("{i}"),
+                    None => "".into()
+                }
+            },
+            Field::Int16(i) => {
+                match i {
+                    Some(i) => format!("{i}"),
+                    None => "".into()
+                }
+            },
+            Field::Int32(i) => {
+                match i {
+                    Some(i) => format!("{i}"),
+                    None => "".into()
+                }
+            },
+            Field::Int64(i) => {
+                match i {
+                    Some(i) => format!("{i}"),
+                    None => "".into()
+                }
+            },
+            Field::Bool(b) => {
+                match b {
+                    Some(b) => format!("{b}"),
+                    None => "".into()
+                }
+            },
+            Field::Time(t) => {
+                match t {
+                    Some(t) => format!("{}", t.to_rfc2822()),
+                    None => "".into()
+                }
+            },
         }
     }
 
     pub fn as_ui_value(&self) -> String {
         match self {
-            Field::String(s) => s.clone(),
-            Field::StringContainer(items) => items.join("\n"),
-            Field::Int8(i) => format!("{i}"),
-            Field::Int16(i) => format!("{i}"),
-            Field::Int32(i) => format!("{i}"),
-            Field::Int64(i) => format!("{i}"),
-            Field::Bool(b) => format!("{b}"),
+            Field::String(s) => {
+                match s {
+                    Some(s) => s.clone(),
+                    None => "".into()
+                }
+            },
+            Field::StringContainer(items) => {
+                match items {
+                    Some(items) => items.join("\n"),
+                    None => "".into()
+                }
+            },
+            Field::Int8(i) => {
+                match i {
+                    Some(i) => format!("{i}"),
+                    None => "".into()
+                }
+            },
+            Field::Int16(i) => {
+                match i {
+                    Some(i) => format!("{i}"),
+                    None => "".into()
+                }
+            },
+            Field::Int32(i) => {
+                match i {
+                    Some(i) => format!("{i}"),
+                    None => "".into()
+                }
+            },
+            Field::Int64(i) => {
+                match i {
+                    Some(i) => format!("{i}"),
+                    None => "".into()
+                }
+            },
+            Field::Bool(b) => {
+                match b {
+                    Some(b) => format!("{b}"),
+                    None => "".into()
+                }
+            },
             //TODO: make a valid time for sql
-            Field::Time(t) => format!("{}", t.to_rfc2822()),
+            Field::Time(t) => {
+                match t {
+                    Some(t) => format!("{}", t.to_rfc2822()),
+                    None => "".into()
+                }
+            },
         }
     }
 }

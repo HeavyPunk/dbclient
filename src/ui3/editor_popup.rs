@@ -19,7 +19,7 @@ use crate::ui3::query_input::EditorInput;
 use super::{AppEvent, Msg};
 
 pub trait EditorPopupWidget: Component<Msg, AppEvent> {
-    fn get_content(&self) -> Option<Field>;
+    fn get_content(&self) -> Field;
     fn get_editor_type(&self) -> String;
 }
 

@@ -40,14 +40,14 @@ WHERE table_schema NOT IN (
 ORDER BY table_schema, table_name;
         ";
         let query_res = client.query(query, &[])?;
-        let mut table: HashMap<String, Vec<Option<Field>>> = HashMap::new();
+        let mut table: HashMap<String, Vec<Field>> = HashMap::new();
         for row in query_res {
             let table_schema: String = row.get(0);
             let table_name: String = row.get(1);
             if let Some(tables) = table.get_mut(&table_schema) {
-                tables.push(Some(Field::String(table_name)));
+                tables.push(Field::String(Some(table_name)));
             } else {
-                table.insert(table_schema, vec![Some(Field::String(table_name))]);
+                table.insert(table_schema, vec![Field::String(Some(table_name))]);
             }
         }
         Ok(super::fetcher::FetchResult::new((vec![], table)))
@@ -79,10 +79,8 @@ ORDER BY table_schema, table_name;
                     let mut values_vec: Vec<String> = vec![];
                     for pair in fields {
                         let (key, val) = (pair.0, pair.1);
-                        if let Some(val) = val {
-                            keys_vec.push(key.clone());
-                            values_vec.push(val.clone().as_sql_value());
-                        }
+                        keys_vec.push(key.clone());
+                        values_vec.push(val.clone().as_sql_value());
                     }
                     let keys = keys_vec.join(",");
                     let values = values_vec.join(",");
@@ -114,7 +112,7 @@ impl<'a> TryFrom<&'a str> for PostgresType {
 
 impl FetchResult {
     fn from_postgres_value(rows: Vec<Row>) -> Result<FetchResult, FetcherError> {
-        let mut table: HashMap<String, Vec<Option<Field>>> = HashMap::new();
+        let mut table: HashMap<String, Vec<Field>> = HashMap::new();
         for row in rows {
             let columns = row.columns();
             for column in columns {
@@ -131,35 +129,35 @@ impl FetchResult {
         Ok(FetchResult::new((keys, table)))
     }
 
-    fn map_column_to_value(column: &Column, row: &Row) -> Result<Option<Field>, FetcherError> {
+    fn map_column_to_value(column: &Column, row: &Row) -> Result<Field, FetcherError> {
         let name = column.name();
         let column_type = column.type_();
         let column_name = column_type.name();
         match column_name {
             "bool" => {
                 let value: bool = row.try_get(name)?;
-                Ok(Some(Field::Bool(value)))
+                Ok(Field::Bool(Some(value)))
             }
             "int2" => {
                 let value: i16 = row.try_get(name)?;
-                Ok(Some(Field::Int16(value)))
+                Ok(Field::Int16(Some(value)))
             }
             "int4" => {
                 let value: i32 = row.try_get(name)?;
-                Ok(Some(Field::Int32(value)))
+                Ok(Field::Int32(Some(value)))
             }
             "int8" => {
                 let value: i64 = row.try_get(name)?;
-                Ok(Some(Field::Int64(value)))
+                Ok(Field::Int64(Some(value)))
             }
             "varchar" => {
                 let value: String = row.try_get(name)?;
-                Ok(Some(Field::String(value)))
+                Ok(Field::String(Some(value)))
             }
             "timestamptz" => {
                 let value: std::time::SystemTime = row.try_get(name)?;
                 let datetime: DateTime<Utc> = value.into();
-                Ok(Some(Field::Time(datetime)))
+                Ok(Field::Time(Some(datetime)))
             }
             _ => Err(FetcherError::MappingError(format!(
                 "[postgresql] failed to map {column_name}"

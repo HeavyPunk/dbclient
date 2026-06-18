@@ -21,7 +21,7 @@ use crate::{
 use super::{AppEvent, Msg};
 
 pub trait EditorPopupWidget: Component<Msg, AppEvent> {
-    fn get_content(&self) -> Option<Field>;
+    fn get_content(&self) -> Field;
     fn get_editor_type(&self) -> String;
 }
 
@@ -43,12 +43,12 @@ impl EditorPopup {
             FetchResult::Table(Some(table)) => {
                 let inputs: Vec<(Box<dyn EditorPopupWidget>, EditorType)> = table
                     .1
-                    .keys()
-                    .map(|key| -> (Box<dyn EditorPopupWidget>, EditorType) {
-                        (
-                            Box::new(EditorSimpleInput::new(key, key)),
-                            EditorType::Oneline,
-                        )
+                    .iter()
+                    .map(|pair| (pair.0, pair.1.first()))
+                    .filter(|pair| pair.1.is_some())
+                    .map(|pair| -> (Box<dyn EditorPopupWidget>, EditorType) {
+                        let field = pair.1.unwrap().clone();
+                        (Box::new(EditorSimpleInput::new(pair.0, pair.0, field)), EditorType::Oneline)
                     })
                     .collect();
                 inputs
