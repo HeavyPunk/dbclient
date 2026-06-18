@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::dbclient::fetcher::FetchRequest;
+use dbclient::Field;
+
+use crate::dbclient::fetcher::{FetchRequest, FetchResult};
 
 pub mod connections_list;
 pub mod db_objects;
@@ -20,15 +22,17 @@ pub enum Msg {
     FetchDbObjects,
     FetchDbObject(String),
     AddDbObject(String, String, String),
+    AddRecordToDbObject(HashMap<String, Option<Field>>),
     ExecuteCustomQuery(String),
     ExecuteQuery(FetchRequest),
     EditorAccept,
     EditorPopupNext,
-    EditorResult(EditorType, HashMap<&'static str, Vec<String>>),
+    EditorResult(EditorType, Id, HashMap<String, Option<Field>>),
     SearchPattern(String),
     ToQueryResultWidget,
     ToDbObjectsWidget,
-    ActivateEditor(EditorType),
+    ActivateEditor(Id, EditorType),
+    //TODO: optimize memory allocation by placing pointer
     DiactivateEditor,
     None,
 }
@@ -54,4 +58,5 @@ pub enum EditorType {
     Search,
     Query,
     AddDbObject,
+    AddRecord,
 }

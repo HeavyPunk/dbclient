@@ -1,4 +1,3 @@
-use dbclient::Field;
 use ratatui::{
     layout::Alignment,
     style::{Color, Modifier, Style},
@@ -231,23 +230,21 @@ impl MockComponent for EditorInput {
 }
 
 impl EditorPopupWidget for EditorInput {
-    fn get_content(&self) -> Option<Field> {
+    fn get_content(&self) -> Vec<String> {
         match self.component.state() {
-            tuirealm::State::One(text_val) => Some(Field::StringContainer(
-                text_val
-                    .unwrap_string()
-                    .lines()
-                    .map(|s| s.to_string())
-                    .collect(),
-            )),
-            tuirealm::State::Vec(lines) => Some(Field::StringContainer(
-                lines.iter().map(|v| v.clone().unwrap_string()).collect(),
-            )),
-            _ => None,
+            tuirealm::State::One(text_val) => text_val
+                .unwrap_string()
+                .lines()
+                .map(|s| s.to_string())
+                .collect(),
+            tuirealm::State::Vec(lines) => {
+                lines.iter().map(|v| v.clone().unwrap_string()).collect()
+            }
+            _ => vec![],
         }
     }
 
-    fn get_editor_type(&self) -> String {
-        self.editor_type.to_string()
-    }
+    // fn get_editor_type(&self) -> &'static str {
+    //     self.editor_type
+    // }
 }

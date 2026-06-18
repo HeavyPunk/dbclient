@@ -11,7 +11,7 @@ use crate::{
 
 use super::{AppEvent, Msg, APP_SEARCH_PATTERN};
 
-mod widgets;
+pub mod widgets;
 
 pub const ATTRIBUTE_CONTENT_TYPE: &str = "attribute-content-type";
 
@@ -99,6 +99,7 @@ impl Component<Msg, AppEvent> for QueryResult {
                 },
                 None => (),
             };
+            res.push(WidgetContext::Caller(super::Id::QueryResult));
             res
         };
         self.component.react_on_event(context, ev)
@@ -106,13 +107,9 @@ impl Component<Msg, AppEvent> for QueryResult {
 }
 
 impl QueryResult {
-    pub fn build_result_table(result: FetchResult) -> Table {
-        if let FetchResult::Table(table) = result {
-            if table.is_none() {
-                return vec![];
-            }
+    pub fn build_result_table(result: &FetchResult) -> Table {
+        if let FetchResult::Table(Some(table)) = result {
             let mut table_builder = TableBuilder::default();
-            let table = table.unwrap();
 
             let headers: Vec<TextSpan> = table
                 .1
@@ -131,8 +128,15 @@ impl QueryResult {
                     let val = column
                         .get(row_index)
                         .cloned()
-                        .unwrap_or_else(|| "".to_string());
-                    table_builder.add_col(TextSpan::new(val));
+                        .unwrap_or_else(|| None);
+                    table_builder.add_col(
+                        TextSpan::new(
+                            val.map_or(
+                                "".to_string(),
+                                |v| v.as_ui_value()
+                            )
+                        )
+                    );
                 }
             }
             table_builder.build()

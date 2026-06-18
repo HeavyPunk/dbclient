@@ -8,14 +8,16 @@ pub mod query_builder;
 pub(crate) mod fetcher {
     use std::collections::HashMap;
 
-    use super::query_builder::QueryElement;
+    use dbclient::Field;
+
+use super::query_builder::QueryElement;
 
     type IndexColumn = String;
 
     #[derive(Debug, PartialEq, Clone)]
     pub enum FetchResult {
         None,
-        Table(Option<(Vec<IndexColumn>, HashMap<String, Vec<String>>)>),
+        Table(Option<(Vec<IndexColumn>, HashMap<String, Vec<Option<Field>>>)>),
     }
 
     #[derive(Debug, PartialEq, Clone)]
@@ -53,7 +55,7 @@ pub(crate) mod fetcher {
             FetchResult::None
         }
 
-        pub fn new(items: (Vec<IndexColumn>, HashMap<String, Vec<String>>)) -> FetchResult {
+        pub fn new(items: (Vec<IndexColumn>, HashMap<String, Vec<Option<Field>>>)) -> FetchResult {
             FetchResult::Table(Some(items))
         }
 
@@ -63,7 +65,7 @@ pub(crate) mod fetcher {
         {
             let mut table = HashMap::new();
             let index_column = "result".to_string();
-            table.insert(index_column.clone(), vec![item.to_string()]);
+            table.insert(index_column.clone(), vec![Some(Field::String(item.to_string()))]);
 
             FetchResult::Table(Some((vec![index_column], table)))
         }
@@ -76,14 +78,14 @@ pub(crate) mod fetcher {
             let index_column = "result".to_string();
             table.insert(
                 index_column.clone(),
-                items.iter().map(|item| item.to_string()).collect(),
+                items.iter().map(|item| Some(Field::String(item.to_string()))).collect(),
             );
             FetchResult::Table(Some((vec![index_column], table)))
         }
 
-        pub fn key_value(items: HashMap<String, String>) -> FetchResult {
-            let keys: Vec<String> = items.keys().cloned().collect();
-            let values: Vec<String> = items.values().cloned().collect();
+        pub fn key_value(items: HashMap<Option<Field>, Option<Field>>) -> FetchResult {
+            let keys: Vec<_> = items.keys().cloned().collect();
+            let values: Vec<_> = items.values().cloned().collect();
             let mut table = HashMap::new();
             let index_column = "keys".to_string();
             table.insert(index_column.clone(), keys);
@@ -125,7 +127,7 @@ pub(crate) mod fetcher {
                         (None, Some(t)) => Some((t.0.clone(), t.1.clone())),
                         (Some(t), None) => Some((t.0.clone(), t.1.clone())),
                         (Some(t1), Some(t2)) => {
-                            let mut merged_table: HashMap<String, Vec<String>> = HashMap::new();
+                            let mut merged_table: HashMap<String, Vec<Option<Field>>> = HashMap::new();
                             let mut index_keys = t1.0.clone();
                             index_keys.extend(t2.0.clone());
                             for (key, value) in &t1.1 {

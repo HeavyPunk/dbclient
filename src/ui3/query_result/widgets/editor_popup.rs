@@ -13,8 +13,10 @@ use tuirealm::{
     AttrValue, Attribute, Component, Event, MockComponent,
 };
 
-use crate::ui3::editor_simple_input::EditorSimpleInput;
-use crate::ui3::query_input::EditorInput;
+use crate::{
+    dbclient::fetcher::FetchResult,
+    ui3::{self, query_result::widgets::editor_simple_input::EditorSimpleInput, Id},
+};
 
 use super::{AppEvent, Msg};
 
@@ -29,43 +31,36 @@ pub enum EditorType {
 }
 
 pub struct EditorPopup {
-    editor_type: crate::ui3::EditorType,
     components: Vec<(Box<dyn EditorPopupWidget>, EditorType)>,
     selected_component_index: usize,
+    editor_type: ui3::EditorType,
+    caller: Id,
 }
 
 impl EditorPopup {
-    pub fn new(editor_type: crate::ui3::EditorType) -> Self {
-        let components: Vec<(Box<dyn EditorPopupWidget>, EditorType)> = match editor_type {
-            super::EditorType::Search => vec![(
-                Box::new(EditorSimpleInput::new("Search", "search")),
-                EditorType::Oneline,
-            )],
-            super::EditorType::Query => vec![(
-                Box::new(EditorInput::new("Query", "query")),
-                EditorType::Multiline,
-            )],
-            super::EditorType::AddDbObject => vec![
-                (
-                    Box::new(EditorSimpleInput::new("Root", "root")),
-                    EditorType::Oneline,
-                ),
-                (
-                    Box::new(EditorSimpleInput::new("Type", "type")),
-                    EditorType::Oneline,
-                ),
-                (
-                    Box::new(EditorSimpleInput::new("Name", "name")),
-                    EditorType::Oneline,
-                ),
-            ],
-            super::EditorType::AddRecord => vec![],
+    pub fn new(fetch_result: &FetchResult, editor_type: ui3::EditorType, caller: Id) -> Self {
+        let components: Vec<(Box<dyn EditorPopupWidget>, EditorType)> = match fetch_result {
+            FetchResult::Table(Some(table)) => {
+                let inputs: Vec<(Box<dyn EditorPopupWidget>, EditorType)> = table
+                    .1
+                    .keys()
+                    .map(|key| -> (Box<dyn EditorPopupWidget>, EditorType) {
+                        (
+                            Box::new(EditorSimpleInput::new(key, key)),
+                            EditorType::Oneline,
+                        )
+                    })
+                    .collect();
+                inputs
+            }
+            _ => vec![],
         };
 
         let mut popup = Self {
-            editor_type,
             components,
             selected_component_index: 0,
+            editor_type,
+            caller,
         };
 
         popup.update_focus();
@@ -96,14 +91,13 @@ impl EditorPopup {
         self.update_focus();
     }
 
-    fn get_title(&self) -> &'static str {
-        match self.editor_type {
-            super::EditorType::Search => "Search",
-            super::EditorType::Query => "Query Editor",
-            super::EditorType::AddDbObject => "Add Database Object",
-            super::EditorType::AddRecord => "Add record",
-        }
-    }
+    // fn get_title(&self) -> &'static str {
+    //     match self.editor_type {
+    //         super::EditorType::Search => "Search",
+    //         super::EditorType::Query => "Query Editor",
+    //         super::EditorType::AddDbObject => "Add Database Object",
+    //     }
+    // }
 }
 
 impl Component<Msg, AppEvent> for EditorPopup {
@@ -141,7 +135,7 @@ impl Component<Msg, AppEvent> for EditorPopup {
                     .collect();
                 Some(Msg::EditorResult(
                     self.editor_type.clone(),
-                    todo!(),
+                    self.caller.clone(),
                     editors_results,
                 ))
             }
@@ -188,7 +182,8 @@ impl MockComponent for EditorPopup {
 
         let inner_area = if self.components.len() > 1 {
             let block = Block::default()
-                .title(self.get_title())
+                // .title(self.get_title())
+                .title("Editor")
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Color::White);
