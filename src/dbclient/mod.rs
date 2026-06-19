@@ -6,7 +6,7 @@ pub mod redis;
 pub mod query_builder;
 
 pub(crate) mod fetcher {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, num::ParseIntError, str::{FromStr, ParseBoolError}};
 
     use dbclient::Field;
 
@@ -34,9 +34,28 @@ use super::query_builder::QueryElement;
     #[derive(Debug)]
     pub enum FetcherError {
         InvalidQuery,
-        MappingError(String),
+        ParsingError(String),
+        StringMappingError(String),
         RedisError(redis::RedisError),
         PostgresError(postgres::Error),
+    }
+
+    impl From<ParseIntError> for FetcherError {
+        fn from(value: ParseIntError) -> Self {
+            FetcherError::ParsingError(value.to_string())
+        }
+    }
+
+    impl From<ParseBoolError> for FetcherError {
+        fn from(value: ParseBoolError) -> Self {
+            FetcherError::ParsingError(value.to_string())
+        }
+    }
+
+    impl From<chrono::ParseError> for FetcherError {
+        fn from(value: chrono::ParseError) -> Self {
+            FetcherError::ParsingError(value.to_string())
+        }
     }
 
     impl From<redis::RedisError> for FetcherError {

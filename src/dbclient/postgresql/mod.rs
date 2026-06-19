@@ -159,7 +159,7 @@ impl FetchResult {
                 let datetime: DateTime<Utc> = value.into();
                 Ok(Field::Time(Some(datetime)))
             }
-            _ => Err(FetcherError::MappingError(format!(
+            _ => Err(FetcherError::StringMappingError(format!(
                 "[postgresql] failed to map {column_name}"
             ))),
         }

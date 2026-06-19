@@ -13,6 +13,19 @@ pub enum Field {
 }
 
 impl Field {
+    pub fn as_type_str(&self) -> &'static str {
+        match self {
+            Field::String(_) => "string",
+            Field::StringContainer(_) => "strings",
+            Field::Int8(_) => "int8",
+            Field::Int16(_) => "int16",
+            Field::Int32(_) => "int32",
+            Field::Int64(_) => "int64",
+            Field::Bool(_) => "bool",
+            Field::Time(_) => "time",
+        }
+    }
+
     pub fn as_sql_value(&self) -> String {
         match self {
             Field::String(str) => {

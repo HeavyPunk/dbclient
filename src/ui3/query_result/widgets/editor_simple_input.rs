@@ -1,3 +1,6 @@
+use std::fmt::Display;
+
+use chrono::{DateTime, Utc};
 use dbclient::Field;
 use ratatui::{layout::Alignment, style::Color};
 use tui_realm_stdlib::Input;
@@ -8,7 +11,7 @@ use tuirealm::{
     AttrValue, Attribute, Component, Event, MockComponent,
 };
 
-use crate::ui3::{query_result::widgets::editor_popup::EditorPopupWidget, AppEvent, Msg};
+use crate::{dbclient::fetcher::FetcherError, ui3::{AppEvent, Msg, query_result::widgets::editor_popup::EditorPopupWidget}};
 
 pub struct EditorSimpleInput {
     component: Input,
@@ -17,9 +20,9 @@ pub struct EditorSimpleInput {
 }
 
 impl EditorSimpleInput {
-    pub fn new(title: impl Into<String>, editor_type: impl Into<String>, field: Field) -> Self {
+    pub fn new(title: impl Into<String> + Display, editor_type: impl Into<String>, field: Field) -> Self {
         Self {
-            component: Input::default().title(title, Alignment::Left).borders(
+            component: Input::default().title(format!("{}({})", title, field.as_type_str()), Alignment::Left).borders(
                 tuirealm::props::Borders::default()
                     .modifiers(BorderType::Rounded)
                     .color(Color::Yellow),
@@ -53,12 +56,93 @@ impl Component<Msg, AppEvent> for EditorSimpleInput {
 }
 
 impl EditorPopupWidget for EditorSimpleInput {
-    fn get_content(&self) -> Field {
+    fn get_content(&self) -> Result<Field, FetcherError> {
         let val = self.component.states.get_value();
-        if val != "" {
-            Field::String(Some(self.component.states.get_value()))
-        } else {
-            Field::String(None)
+        match &self.field {
+            Field::String(s) => {
+                if s.is_some() {
+                    Ok(Field::String(Some(val)))
+                } else if val != "" {
+                    Ok(Field::String(None))
+                } else {
+                    Ok(Field::String(Some(val)))
+                }
+            },
+            Field::StringContainer(items) => {
+                if items.is_some() {
+                    Ok(Field::StringContainer(Some(vec![val])))
+                } else if val != "" {
+                    Ok(Field::StringContainer(None))
+                } else {
+                    Ok(Field::StringContainer(Some(vec![val])))
+                }
+            },
+            Field::Int8(i) => {
+                if i.is_some() {
+                    let val: i8 = val.parse()?;
+                    Ok(Field::Int8(Some(val)))
+                } else if val != "" {
+                    Ok(Field::Int8(None))
+                } else {
+                    let val: i8 = val.parse()?;
+                    Ok(Field::Int8(Some(val)))
+                }
+            },
+            Field::Int16(i) => {
+                if i.is_some() {
+                    let val: i16 = val.parse()?;
+                    Ok(Field::Int16(Some(val)))
+                } else if val != "" {
+                    Ok(Field::Int16(None))
+                } else {
+                    let val: i16 = val.parse()?;
+                    Ok(Field::Int16(Some(val)))
+                }
+            },
+            Field::Int32(i) => {
+                if i.is_some() {
+                    let val: i32 = val.parse()?;
+                    Ok(Field::Int32(Some(val)))
+                } else if val != "" {
+                    Ok(Field::Int32(None))
+                } else {
+                    let val: i32 = val.parse()?;
+                    Ok(Field::Int32(Some(val)))
+                }
+            },
+            Field::Int64(i) => {
+                if i.is_some() {
+                    let val: i64 = val.parse()?;
+                    Ok(Field::Int64(Some(val)))
+                } else if val != "" {
+                    Ok(Field::Int64(None))
+                } else {
+                    let val: i64 = val.parse()?;
+                    Ok(Field::Int64(Some(val)))
+                }
+            },
+            Field::Bool(b) => {
+                if b.is_some() {
+                    let val: bool = val.parse()?;
+                    Ok(Field::Bool(Some(val)))
+                } else if val != "" {
+                    Ok(Field::Bool(None))
+                } else {
+                    let val: bool = val.parse()?;
+                    Ok(Field::Bool(Some(val)))
+                }
+            },
+            Field::Time(date_time) => {
+                if date_time.is_some() {
+                    let val: DateTime<Utc> = val.parse()?;
+                    Ok(Field::Time(Some(val)))
+                } else if val != "" {
+                    Ok(Field::Time(None))
+                } else {
+                    let val: DateTime<Utc> = val.parse()?;
+                    Ok(Field::Time(Some(val)))
+                }
+            },
         }
     }
 

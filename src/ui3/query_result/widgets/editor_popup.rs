@@ -14,14 +14,14 @@ use tuirealm::{
 };
 
 use crate::{
-    dbclient::fetcher::FetchResult,
-    ui3::{self, query_result::widgets::editor_simple_input::EditorSimpleInput, Id},
+    dbclient::fetcher::{FetchResult, FetcherError},
+    ui3::{self, Id, query_result::widgets::editor_simple_input::EditorSimpleInput},
 };
 
 use super::{AppEvent, Msg};
 
 pub trait EditorPopupWidget: Component<Msg, AppEvent> {
-    fn get_content(&self) -> Field;
+    fn get_content(&self) -> Result<Field, FetcherError>;
     fn get_editor_type(&self) -> String;
 }
 
@@ -125,19 +125,26 @@ impl Component<Msg, AppEvent> for EditorPopup {
             .unwrap();
         match component.on(ev) {
             Some(Msg::EditorAccept) => {
-                let editors_results: HashMap<_, _> = self
+                let editors_results: Result<HashMap<String, Field>, FetcherError> = self
                     .components
                     .iter()
                     .map(|c| {
                         let content = c.0.get_content();
-                        (c.0.get_editor_type(), content)
+                        match content {
+                            Ok(f) => Ok((c.0.get_editor_type(), f)),
+                            Err(e) => Err(e),
+                        }
                     })
                     .collect();
-                Some(Msg::EditorResult(
-                    self.editor_type.clone(),
-                    self.caller.clone(),
-                    editors_results,
-                ))
+                match editors_results {
+                    Ok(r) => Some(Msg::EditorResult(
+                        self.editor_type.clone(),
+                        self.caller.clone(),
+                        r,
+                    )),
+                    Err(_) => Some(Msg::None),
+                }
+                
             }
             Some(Msg::EditorPopupNext) => {
                 self.next_component();
