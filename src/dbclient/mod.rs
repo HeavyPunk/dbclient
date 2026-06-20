@@ -6,18 +6,22 @@ pub mod redis;
 pub mod query_builder;
 
 pub(crate) mod fetcher {
-    use std::collections::HashMap;
+    use std::{
+        collections::HashMap,
+        num::ParseIntError,
+        str::{FromStr, ParseBoolError},
+    };
 
     use dbclient::Field;
 
-use super::query_builder::QueryElement;
+    use super::query_builder::QueryElement;
 
     type IndexColumn = String;
 
     #[derive(Debug, PartialEq, Clone)]
     pub enum FetchResult {
         None,
-        Table(Option<(Vec<IndexColumn>, HashMap<String, Vec<Option<Field>>>)>),
+        Table(Option<(Vec<IndexColumn>, HashMap<String, Vec<Field>>)>),
     }
 
     #[derive(Debug, PartialEq, Clone)]
@@ -34,9 +38,28 @@ use super::query_builder::QueryElement;
     #[derive(Debug)]
     pub enum FetcherError {
         InvalidQuery,
-        MappingError(String),
+        ParsingError(String),
+        StringMappingError(String),
         RedisError(redis::RedisError),
         PostgresError(postgres::Error),
+    }
+
+    impl From<ParseIntError> for FetcherError {
+        fn from(value: ParseIntError) -> Self {
+            FetcherError::ParsingError(value.to_string())
+        }
+    }
+
+    impl From<ParseBoolError> for FetcherError {
+        fn from(value: ParseBoolError) -> Self {
+            FetcherError::ParsingError(value.to_string())
+        }
+    }
+
+    impl From<chrono::ParseError> for FetcherError {
+        fn from(value: chrono::ParseError) -> Self {
+            FetcherError::ParsingError(value.to_string())
+        }
     }
 
     impl From<redis::RedisError> for FetcherError {
@@ -55,7 +78,7 @@ use super::query_builder::QueryElement;
             FetchResult::None
         }
 
-        pub fn new(items: (Vec<IndexColumn>, HashMap<String, Vec<Option<Field>>>)) -> FetchResult {
+        pub fn new(items: (Vec<IndexColumn>, HashMap<String, Vec<Field>>)) -> FetchResult {
             FetchResult::Table(Some(items))
         }
 
@@ -65,7 +88,10 @@ use super::query_builder::QueryElement;
         {
             let mut table = HashMap::new();
             let index_column = "result".to_string();
-            table.insert(index_column.clone(), vec![Some(Field::String(item.to_string()))]);
+            table.insert(
+                index_column.clone(),
+                vec![Field::String(Some(item.to_string()))],
+            );
 
             FetchResult::Table(Some((vec![index_column], table)))
         }
@@ -78,12 +104,15 @@ use super::query_builder::QueryElement;
             let index_column = "result".to_string();
             table.insert(
                 index_column.clone(),
-                items.iter().map(|item| Some(Field::String(item.to_string()))).collect(),
+                items
+                    .iter()
+                    .map(|item| Field::String(Some(item.to_string())))
+                    .collect(),
             );
             FetchResult::Table(Some((vec![index_column], table)))
         }
 
-        pub fn key_value(items: HashMap<Option<Field>, Option<Field>>) -> FetchResult {
+        pub fn key_value(items: HashMap<Field, Field>) -> FetchResult {
             let keys: Vec<_> = items.keys().cloned().collect();
             let values: Vec<_> = items.values().cloned().collect();
             let mut table = HashMap::new();
@@ -127,7 +156,7 @@ use super::query_builder::QueryElement;
                         (None, Some(t)) => Some((t.0.clone(), t.1.clone())),
                         (Some(t), None) => Some((t.0.clone(), t.1.clone())),
                         (Some(t1), Some(t2)) => {
-                            let mut merged_table: HashMap<String, Vec<Option<Field>>> = HashMap::new();
+                            let mut merged_table: HashMap<String, Vec<Field>> = HashMap::new();
                             let mut index_keys = t1.0.clone();
                             index_keys.extend(t2.0.clone());
                             for (key, value) in &t1.1 {

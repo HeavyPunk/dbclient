@@ -19,7 +19,7 @@ use crate::ui3::query_input::EditorInput;
 use super::{AppEvent, Msg};
 
 pub trait EditorPopupWidget: Component<Msg, AppEvent> {
-    fn get_content(&self) -> Option<Field>;
+    fn get_content(&self) -> Field;
     fn get_editor_type(&self) -> String;
 }
 
@@ -60,6 +60,7 @@ impl EditorPopup {
                 ),
             ],
             super::EditorType::AddRecord => vec![],
+            super::EditorType::UpdateRecord => vec![],
         };
 
         let mut popup = Self {
@@ -102,6 +103,7 @@ impl EditorPopup {
             super::EditorType::Query => "Query Editor",
             super::EditorType::AddDbObject => "Add Database Object",
             super::EditorType::AddRecord => "Add record",
+            super::EditorType::UpdateRecord => "Update record",
         }
     }
 }
@@ -143,6 +145,7 @@ impl Component<Msg, AppEvent> for EditorPopup {
                     self.editor_type.clone(),
                     todo!(),
                     editors_results,
+                    todo!(),
                 ))
             }
             Some(Msg::EditorPopupNext) => {

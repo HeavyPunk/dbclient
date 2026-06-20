@@ -83,12 +83,15 @@ impl Fetcher for RedisFetcher {
                         }
                         RedisType::Hash => {
                             let res: HashMap<String, String> = connection.hgetall(index)?;
-                            let res: HashMap<Option<Field>, Option<Field>> = res
+                            let res: HashMap<Field, Field> = res
                                 .iter()
-                                .map(|pair| (
-                                    Some(Field::String(pair.0.clone())),
-                                    Some(Field::String(pair.1.clone()))
-                                )).collect();
+                                .map(|pair| {
+                                    (
+                                        Field::String(Some(pair.0.clone())),
+                                        Field::String(Some(pair.1.clone())),
+                                    )
+                                })
+                                .collect();
                             FetchResult::key_value(res)
                         }
                         RedisType::Stream => FetchResult::none(),
@@ -126,6 +129,7 @@ impl Fetcher for RedisFetcher {
                     Ok(res)
                 }
                 QueryElement::AddRecordToDbObject(_, _) => unimplemented!(),
+                QueryElement::UpdateRecord(_, _, _) => unimplemented!(),
             },
             None => Err(FetcherError::InvalidQuery),
         }
@@ -173,7 +177,7 @@ fn get_index_type(
         match table {
             Some(table) => match table.1.iter().last() {
                 Some((_, column)) => match column.first() {
-                    Some(Some(Field::String(val))) => val.as_str().try_into(),
+                    Some(Field::String(Some(val))) => val.as_str().try_into(),
                     _ => Err(FetcherError::InvalidQuery),
                 },
                 None => Err(FetcherError::InvalidQuery),

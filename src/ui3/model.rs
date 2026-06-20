@@ -11,7 +11,8 @@ use crate::{
         connections_list::ConnectionsListComponent,
         db_objects::DbObjects,
         query_result::{
-            widgets::editor_popup::EditorPopup, ContentType, QueryResult, ATTRIBUTE_CONTENT_TYPE,
+            widgets::{editor_popup::EditorPopup, UiSelectorFor},
+            ContentType, QueryResult, ATTRIBUTE_CONTENT_TYPE,
         },
     },
 };
@@ -222,7 +223,7 @@ impl Model<CrosstermTerminalAdapter> {
         return Some(Msg::ExecuteQuery(query));
     }
 
-    fn add_record_to_db_object(&mut self, fields: HashMap<String, Option<Field>>) -> Option<Msg> {
+    fn add_record_to_db_object(&mut self, fields: HashMap<String, Field>) -> Option<Msg> {
         if let Some(db_object) = &self.selected_db_object {
             let query = FetchRequest {
                 query: vec![QueryElement::AddRecordToDbObject(db_object.clone(), fields)],
@@ -231,6 +232,39 @@ impl Model<CrosstermTerminalAdapter> {
             return Some(Msg::ExecuteQuery(query));
         } else {
             return Some(Msg::None);
+        }
+    }
+
+    fn update_record_in_db_object(
+        &mut self,
+        fields: HashMap<String, Field>,
+        fetch_result_selector: UiSelectorFor,
+    ) -> Option<Msg> {
+        match (&self.selected_db_object, &self.current_fetch_result) {
+            (Some(db_object), Some(current_fr)) => {
+                let indexes: HashMap<String, Field> = match (current_fr, fetch_result_selector) {
+                    (FetchResult::Table(Some(table)), UiSelectorFor::Table(selected_row_index)) => {
+                        let mut indexes = HashMap::new();
+                        for index_name in &table.0 {
+                            let index_fields = table.1.get(index_name).unwrap();
+                            let index_field = index_fields.get(selected_row_index).unwrap();
+                            indexes.insert(index_name.clone(), index_field.clone());
+                        }
+                        indexes
+                    }
+                    _ => HashMap::new(),
+                };
+                let query = FetchRequest {
+                    query: vec![QueryElement::UpdateRecord(
+                        db_object.clone(),
+                        fields,
+                        indexes,
+                    )],
+                    limit: usize::MAX,
+                };
+                Some(Msg::ExecuteQuery(query))
+            }
+            _ => Some(Msg::None),
         }
     }
 
@@ -367,6 +401,9 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                 }
 
                 Msg::AddRecordToDbObject(fields) => self.add_record_to_db_object(fields),
+                Msg::UpdateRecord(fields, fetch_result_selector) => {
+                    self.update_record_in_db_object(fields, fetch_result_selector)
+                }
 
                 Msg::ExecuteCustomQuery(query) => self.execute_custom_query(query),
 
@@ -385,14 +422,19 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                     assert!(self.app.active(&Id::QueryResult).is_ok());
                     None
                 }
-                Msg::ActivateEditor(caller, widget_kind) => {
+                Msg::ActivateEditor(caller, widget_kind, ui_selector) => {
                     self.show_editor = true;
                     if let Some(fetch_res) = &self.current_fetch_result {
                         assert!(self
                             .app
                             .mount(
                                 Id::QueryLine,
-                                Box::new(EditorPopup::new(fetch_res, widget_kind, caller)),
+                                Box::new(EditorPopup::new(
+                                    fetch_res,
+                                    ui_selector,
+                                    widget_kind,
+                                    caller
+                                )),
                                 vec![]
                             )
                             .is_ok());
@@ -409,7 +451,7 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                     None
                 }
 
-                Msg::EditorResult(editor_type, caller, editors) => {
+                Msg::EditorResult(editor_type, caller, editors, fetch_result_selector) => {
                     if self.app.mounted(&Id::QueryLine) {
                         assert!(self.app.umount(&Id::QueryLine).is_ok());
                     }
@@ -417,11 +459,18 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                     match caller {
                         Id::QueryResult => match editor_type {
                             super::EditorType::AddRecord => {
-                                let res: HashMap<String, Option<Field>> = editors
+                                let res: HashMap<String, Field> = editors
                                     .iter()
                                     .map(|pair| (pair.0.clone(), pair.1.clone()))
                                     .collect();
                                 return Some(Msg::AddRecordToDbObject(res));
+                            }
+                            super::EditorType::UpdateRecord => {
+                                let res: HashMap<String, Field> = editors
+                                    .iter()
+                                    .map(|pair| (pair.0.clone(), pair.1.clone()))
+                                    .collect();
+                                return Some(Msg::UpdateRecord(res, fetch_result_selector));
                             }
                             _ => return Some(Msg::None),
                         },
@@ -431,44 +480,51 @@ impl Update<Msg> for Model<CrosstermTerminalAdapter> {
                     match editor_type {
                         super::EditorType::Search => {
                             let pattern = match editors.get("search") {
-                                Some(Some(Field::String(str))) => str.clone(),
-                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                Some(Field::String(Some(str))) => str.clone(),
+                                Some(Field::StringContainer(Some(strs))) => strs.join("\n"),
                                 _ => "".to_string(),
                             };
                             Some(Msg::SearchPattern(pattern))
                         }
                         super::EditorType::Query => {
                             let query = match editors.get("query") {
-                                Some(Some(Field::String(str))) => str.clone(),
-                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                Some(Field::String(Some(str))) => str.clone(),
+                                Some(Field::StringContainer(Some(strs))) => strs.join("\n"),
                                 _ => "".to_string(),
                             };
                             Some(Msg::ExecuteCustomQuery(query))
                         }
                         super::EditorType::AddDbObject => {
                             let root = match editors.get("root") {
-                                Some(Some(Field::String(str))) => str.clone(),
-                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                Some(Field::String(Some(str))) => str.clone(),
+                                Some(Field::StringContainer(Some(strs))) => strs.join("\n"),
                                 _ => "".to_string(),
                             };
                             let obj_type = match editors.get("type") {
-                                Some(Some(Field::String(str))) => str.clone(),
-                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                Some(Field::String(Some(str))) => str.clone(),
+                                Some(Field::StringContainer(Some(strs))) => strs.join("\n"),
                                 _ => "".to_string(),
                             };
                             let name = match editors.get("name") {
-                                Some(Some(Field::String(str))) => str.clone(),
-                                Some(Some(Field::StringContainer(strs))) => strs.join("\n"),
+                                Some(Field::String(Some(str))) => str.clone(),
+                                Some(Field::StringContainer(Some(strs))) => strs.join("\n"),
                                 _ => "".to_string(),
                             };
                             Some(Msg::AddDbObject(root, obj_type, name))
                         }
                         super::EditorType::AddRecord => {
-                            let res: HashMap<String, Option<Field>> = editors
+                            let res: HashMap<String, Field> = editors
                                 .iter()
                                 .map(|pair| (pair.0.clone(), pair.1.clone()))
                                 .collect();
                             Some(Msg::AddRecordToDbObject(res))
+                        }
+                        super::EditorType::UpdateRecord => {
+                            let res: HashMap<String, Field> = editors
+                                .iter()
+                                .map(|pair| (pair.0.clone(), pair.1.clone()))
+                                .collect();
+                            Some(Msg::UpdateRecord(res, fetch_result_selector))
                         }
                     }
                 }

@@ -7,5 +7,6 @@ pub enum QueryElement {
     RawQuery(String),
     ListAllItemsFrom(String),
     AddDatabaseObject(String, String, String),
-    AddRecordToDbObject(String, HashMap<String, Option<Field>>),
+    AddRecordToDbObject(String, HashMap<String, Field>),
+    UpdateRecord(String, HashMap<String, Field>, HashMap<String, Field>),
 }

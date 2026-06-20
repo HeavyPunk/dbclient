@@ -14,14 +14,18 @@ use tuirealm::{
 };
 
 use crate::{
-    dbclient::fetcher::FetchResult,
-    ui3::{self, query_result::widgets::editor_simple_input::EditorSimpleInput, Id},
+    dbclient::fetcher::{FetchResult, FetcherError},
+    ui3::{
+        self,
+        query_result::widgets::{editor_simple_input::EditorSimpleInput, UiSelectorFor},
+        Id,
+    },
 };
 
 use super::{AppEvent, Msg};
 
 pub trait EditorPopupWidget: Component<Msg, AppEvent> {
-    fn get_content(&self) -> Option<Field>;
+    fn get_content(&self) -> Result<Field, FetcherError>;
     fn get_editor_type(&self) -> String;
 }
 
@@ -32,32 +36,46 @@ pub enum EditorType {
 
 pub struct EditorPopup {
     components: Vec<(Box<dyn EditorPopupWidget>, EditorType)>,
+    fetch_result_internal_selector: UiSelectorFor,
     selected_component_index: usize,
     editor_type: ui3::EditorType,
     caller: Id,
 }
 
 impl EditorPopup {
-    pub fn new(fetch_result: &FetchResult, editor_type: ui3::EditorType, caller: Id) -> Self {
-        let components: Vec<(Box<dyn EditorPopupWidget>, EditorType)> = match fetch_result {
-            FetchResult::Table(Some(table)) => {
-                let inputs: Vec<(Box<dyn EditorPopupWidget>, EditorType)> = table
-                    .1
-                    .keys()
-                    .map(|key| -> (Box<dyn EditorPopupWidget>, EditorType) {
-                        (
-                            Box::new(EditorSimpleInput::new(key, key)),
-                            EditorType::Oneline,
-                        )
-                    })
-                    .collect();
-                inputs
-            }
-            _ => vec![],
-        };
+    pub fn new(
+        fetch_result: &FetchResult,
+        entity_selector: UiSelectorFor,
+        editor_type: ui3::EditorType,
+        caller: Id,
+    ) -> Self {
+        let components: Vec<(Box<dyn EditorPopupWidget>, EditorType)> =
+            match (fetch_result, entity_selector.clone()) {
+                (FetchResult::Table(Some(table)), UiSelectorFor::Table(row_index)) => {
+                    let inputs: Vec<(Box<dyn EditorPopupWidget>, EditorType)> = table
+                        .1
+                        .iter()
+                        .map(|pair| (pair.0, pair.1.get(row_index)))
+                        .filter(|pair| pair.1.is_some())
+                        .map(|pair| -> (Box<dyn EditorPopupWidget>, EditorType) {
+                            let mut field = pair.1.unwrap().clone();
+                            if editor_type == ui3::EditorType::AddRecord {
+                                field = field.as_only_type();
+                            }
+                            (
+                                Box::new(EditorSimpleInput::new(pair.0, pair.0, field)),
+                                EditorType::Oneline,
+                            )
+                        })
+                        .collect();
+                    inputs
+                }
+                _ => vec![],
+            };
 
         let mut popup = Self {
             components,
+            fetch_result_internal_selector: entity_selector,
             selected_component_index: 0,
             editor_type,
             caller,
@@ -125,19 +143,26 @@ impl Component<Msg, AppEvent> for EditorPopup {
             .unwrap();
         match component.on(ev) {
             Some(Msg::EditorAccept) => {
-                let editors_results: HashMap<_, _> = self
+                let editors_results: Result<HashMap<String, Field>, FetcherError> = self
                     .components
                     .iter()
                     .map(|c| {
                         let content = c.0.get_content();
-                        (c.0.get_editor_type(), content)
+                        match content {
+                            Ok(f) => Ok((c.0.get_editor_type(), f)),
+                            Err(e) => Err(e),
+                        }
                     })
                     .collect();
-                Some(Msg::EditorResult(
-                    self.editor_type.clone(),
-                    self.caller.clone(),
-                    editors_results,
-                ))
+                match editors_results {
+                    Ok(r) => Some(Msg::EditorResult(
+                        self.editor_type.clone(),
+                        self.caller.clone(),
+                        r,
+                        self.fetch_result_internal_selector.clone(),
+                    )),
+                    Err(_) => Some(Msg::None),
+                }
             }
             Some(Msg::EditorPopupNext) => {
                 self.next_component();

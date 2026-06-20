@@ -125,18 +125,8 @@ impl QueryResult {
             for row_index in 0..max_len {
                 table_builder.add_row();
                 for column in table.1.values() {
-                    let val = column
-                        .get(row_index)
-                        .cloned()
-                        .unwrap_or_else(|| None);
-                    table_builder.add_col(
-                        TextSpan::new(
-                            val.map_or(
-                                "".to_string(),
-                                |v| v.as_ui_value()
-                            )
-                        )
-                    );
+                    let val = column.get(row_index).cloned().unwrap();
+                    table_builder.add_col(TextSpan::new(val.as_ui_value()));
                 }
             }
             table_builder.build()
