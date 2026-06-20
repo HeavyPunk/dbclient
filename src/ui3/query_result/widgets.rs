@@ -17,6 +17,11 @@ pub enum QueryResultWidget {
     Table(tui_realm_stdlib::Table),
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum UiSelectorFor {
+    Table(usize),
+}
+
 impl QueryResultWidget {
     pub fn react_on_event(
         &mut self,

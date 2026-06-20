@@ -23,7 +23,11 @@ pub fn table_react(
             for context in context {
                 match context {
                     WidgetContext::Caller(id) => {
-                        return Some(Msg::ActivateEditor(id, EditorType::Query))
+                        return Some(Msg::ActivateEditor(
+                            id,
+                            EditorType::Query,
+                            super::UiSelectorFor::Table(table.states.list_index - 1),
+                        ))
                     }
                     _ => (),
                 }
@@ -51,7 +55,11 @@ pub fn table_react(
             for context in context {
                 match context {
                     WidgetContext::Caller(id) => {
-                        return Some(Msg::ActivateEditor(id, EditorType::Search))
+                        return Some(Msg::ActivateEditor(
+                            id,
+                            EditorType::Search,
+                            super::UiSelectorFor::Table(table.states.list_index),
+                        ))
                     }
                     _ => (),
                 }
@@ -166,7 +174,29 @@ pub fn table_react(
             for context in context {
                 match context {
                     WidgetContext::Caller(id) => {
-                        return Some(Msg::ActivateEditor(id, EditorType::AddRecord))
+                        return Some(Msg::ActivateEditor(
+                            id,
+                            EditorType::AddRecord,
+                            super::UiSelectorFor::Table(table.states.list_index - 1),
+                        ))
+                    }
+                    _ => (),
+                }
+            }
+            Some(Msg::None)
+        }
+        Event::Keyboard(KeyEvent {
+            code: Key::Char('i'),
+            ..
+        }) => {
+            for context in context {
+                match context {
+                    WidgetContext::Caller(id) => {
+                        return Some(Msg::ActivateEditor(
+                            id,
+                            EditorType::UpdateRecord,
+                            super::UiSelectorFor::Table(table.states.list_index - 1),
+                        ))
                     }
                     _ => (),
                 }

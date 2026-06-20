@@ -6,11 +6,15 @@ pub mod redis;
 pub mod query_builder;
 
 pub(crate) mod fetcher {
-    use std::{collections::HashMap, num::ParseIntError, str::{FromStr, ParseBoolError}};
+    use std::{
+        collections::HashMap,
+        num::ParseIntError,
+        str::{FromStr, ParseBoolError},
+    };
 
     use dbclient::Field;
 
-use super::query_builder::QueryElement;
+    use super::query_builder::QueryElement;
 
     type IndexColumn = String;
 
@@ -84,7 +88,10 @@ use super::query_builder::QueryElement;
         {
             let mut table = HashMap::new();
             let index_column = "result".to_string();
-            table.insert(index_column.clone(), vec![Field::String(Some(item.to_string()))]);
+            table.insert(
+                index_column.clone(),
+                vec![Field::String(Some(item.to_string()))],
+            );
 
             FetchResult::Table(Some((vec![index_column], table)))
         }
@@ -97,7 +104,10 @@ use super::query_builder::QueryElement;
             let index_column = "result".to_string();
             table.insert(
                 index_column.clone(),
-                items.iter().map(|item| Field::String(Some(item.to_string()))).collect(),
+                items
+                    .iter()
+                    .map(|item| Field::String(Some(item.to_string())))
+                    .collect(),
             );
             FetchResult::Table(Some((vec![index_column], table)))
         }

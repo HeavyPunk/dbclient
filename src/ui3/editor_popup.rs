@@ -60,6 +60,7 @@ impl EditorPopup {
                 ),
             ],
             super::EditorType::AddRecord => vec![],
+            super::EditorType::UpdateRecord => vec![],
         };
 
         let mut popup = Self {
@@ -102,6 +103,7 @@ impl EditorPopup {
             super::EditorType::Query => "Query Editor",
             super::EditorType::AddDbObject => "Add Database Object",
             super::EditorType::AddRecord => "Add record",
+            super::EditorType::UpdateRecord => "Update record",
         }
     }
 }
@@ -143,6 +145,7 @@ impl Component<Msg, AppEvent> for EditorPopup {
                     self.editor_type.clone(),
                     todo!(),
                     editors_results,
+                    todo!(),
                 ))
             }
             Some(Msg::EditorPopupNext) => {

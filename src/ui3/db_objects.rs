@@ -46,6 +46,9 @@ impl Component<Msg, AppEvent> for DbObjects {
             }) => Some(Msg::ActivateEditor(
                 super::Id::DbObjects,
                 EditorType::AddDbObject,
+                super::query_result::widgets::UiSelectorFor::Table(
+                    self.component.states.list_index,
+                ),
             )),
             Event::Keyboard(KeyEvent {
                 code: Key::Char('/'),
@@ -53,6 +56,9 @@ impl Component<Msg, AppEvent> for DbObjects {
             }) => Some(Msg::ActivateEditor(
                 super::Id::DbObjects,
                 EditorType::Search,
+                super::query_result::widgets::UiSelectorFor::Table(
+                    self.component.states.list_index,
+                ),
             )),
             Event::Keyboard(KeyEvent {
                 code: Key::Char('n'),

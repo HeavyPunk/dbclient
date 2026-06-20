@@ -85,10 +85,13 @@ impl Fetcher for RedisFetcher {
                             let res: HashMap<String, String> = connection.hgetall(index)?;
                             let res: HashMap<Field, Field> = res
                                 .iter()
-                                .map(|pair| (
-                                    Field::String(Some(pair.0.clone())),
-                                    Field::String(Some(pair.1.clone()))
-                                )).collect();
+                                .map(|pair| {
+                                    (
+                                        Field::String(Some(pair.0.clone())),
+                                        Field::String(Some(pair.1.clone())),
+                                    )
+                                })
+                                .collect();
                             FetchResult::key_value(res)
                         }
                         RedisType::Stream => FetchResult::none(),
@@ -126,6 +129,7 @@ impl Fetcher for RedisFetcher {
                     Ok(res)
                 }
                 QueryElement::AddRecordToDbObject(_, _) => unimplemented!(),
+                QueryElement::UpdateRecord(_, _, _) => unimplemented!(),
             },
             None => Err(FetcherError::InvalidQuery),
         }

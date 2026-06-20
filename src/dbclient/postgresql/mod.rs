@@ -79,6 +79,17 @@ ORDER BY table_schema, table_name;
                     let mut values_vec: Vec<String> = vec![];
                     for pair in fields {
                         let (key, val) = (pair.0, pair.1);
+                        match val {
+                            Field::String(None)
+                            | Field::StringContainer(None)
+                            | Field::Int8(None)
+                            | Field::Int16(None)
+                            | Field::Int32(None)
+                            | Field::Int64(None)
+                            | Field::Bool(None)
+                            | Field::Time(None) => continue,
+                            _ => (),
+                        };
                         keys_vec.push(key.clone());
                         values_vec.push(val.clone().as_sql_value());
                     }
@@ -86,6 +97,35 @@ ORDER BY table_schema, table_name;
                     let values = values_vec.join(",");
 
                     let query = format!("INSERT INTO {db_object} ({keys}) VALUES ({values})");
+                    client.execute(&query, &[])?;
+                    Ok(FetchResult::none())
+                }
+                QueryElement::UpdateRecord(db_object, fields, table_indexes) => {
+                    let mut updates = vec![];
+                    let mut indexes = vec![];
+                    for pair in fields {
+                        let (key, val) = (pair.0, pair.1);
+                        match val {
+                            Field::String(None)
+                            | Field::StringContainer(None)
+                            | Field::Int8(None)
+                            | Field::Int16(None)
+                            | Field::Int32(None)
+                            | Field::Int64(None)
+                            | Field::Bool(None)
+                            | Field::Time(None) => continue,
+                            _ => (),
+                        };
+                        updates.push(format!("{}={}", key, val.as_sql_value()));
+                    }
+                    for pair in table_indexes {
+                        let (key, val) = (pair.0, pair.1);
+                        indexes.push(format!("{}={}", key, val.as_sql_value()));
+                    }
+                    let updates = updates.join(",");
+                    let indexes = indexes.join(" AND ");
+
+                    let query = format!("UPDATE {db_object} SET {updates} WHERE {indexes}");
                     client.execute(&query, &[])?;
                     Ok(FetchResult::none())
                 }
