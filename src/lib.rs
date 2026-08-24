@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
 
+pub mod hotkey_manager;
+
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Field {
     String(Option<String>),

@@ -26,7 +26,7 @@ pub fn table_react(
                         return Some(Msg::ActivateEditor(
                             id,
                             EditorType::Query,
-                            super::UiSelectorFor::Table(table.states.list_index - 1),
+                            super::UiSelectorFor::Table(table.states.list_index.saturating_sub(1)),
                         ))
                     }
                     _ => (),
@@ -177,7 +177,7 @@ pub fn table_react(
                         return Some(Msg::ActivateEditor(
                             id,
                             EditorType::AddRecord,
-                            super::UiSelectorFor::Table(table.states.list_index - 1),
+                            super::UiSelectorFor::Table(table.states.list_index.saturating_sub(1)),
                         ))
                     }
                     _ => (),
@@ -195,7 +195,7 @@ pub fn table_react(
                         return Some(Msg::ActivateEditor(
                             id,
                             EditorType::UpdateRecord,
-                            super::UiSelectorFor::Table(table.states.list_index - 1),
+                            super::UiSelectorFor::Table(table.states.list_index.saturating_sub(1)),
                         ))
                     }
                     _ => (),

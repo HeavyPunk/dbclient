@@ -68,7 +68,35 @@ ORDER BY table_schema, table_name;
                 QueryElement::ListAllItemsFrom(index) => {
                     let query = format!("SELECT * FROM {}", index);
                     let rows = client.query(&query, &[])?;
-                    FetchResult::from_postgres_value(rows)
+                    if !rows.is_empty() {
+                        FetchResult::from_postgres_value(rows)
+                    } else {
+                        //NOTE: get fields metadata to have ability to create records on empty
+                        //tables
+                        let query = format!("
+SELECT
+  column_name,
+  udt_name
+FROM information_schema.columns
+WHERE table_name = '{index}'
+ORDER BY ordinal_position LIMIT 100");
+                        let rows = client.query(&query, &[])?;
+                        let mut table: HashMap<String, Vec<Field>> = HashMap::new();
+                        for row in rows {
+                            let column_name: String = row.try_get("column_name")?;
+                            let column_type: String = row.try_get("udt_name")?;
+                            match column_type.as_str() {
+                                "bool" => { table.insert(column_name, vec![Field::Bool(None)]); },
+                                "int2" => { table.insert(column_name, vec![Field::Int16(None)]); },
+                                "int4" => { table.insert(column_name, vec![Field::Int32(None)]); },
+                                "int8" => { table.insert(column_name, vec![Field::Int64(None)]); },
+                                "varchar" => { table.insert(column_name, vec![Field::String(None)]); },
+                                "timestamptz" => { table.insert(column_name, vec![Field::Time(None)]); },
+                                _ => ()
+                            };
+                        }
+                        Ok(FetchResult::new((vec![], table)))
+                    }
                 }
                 QueryElement::AddDatabaseObject(_, _, _) => {
                     //TODO: need to extend database object context to create a table
