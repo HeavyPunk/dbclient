@@ -1,3 +1,4 @@
+use dbclient::hotkey_manager::{self, HotKeyError, HotKeyManager};
 use ratatui::{layout::Alignment, style::Color};
 use tuirealm::{
     event::{Key, KeyEvent},
@@ -10,13 +11,26 @@ use crate::config::Connection;
 use super::{AppEvent, Msg};
 
 #[derive(MockComponent)]
-pub struct ConnectionsListComponent {
+pub struct ConnectionsListComponent<> {
+    hk_manager: HotKeyManager<Key, Self, Option<Msg>>,
     component: tui_realm_stdlib::Table,
 }
 
 impl Default for ConnectionsListComponent {
     fn default() -> Self {
+        let mut hk_manager = HotKeyManager::new();
+        hk_manager.register(&[Key::Esc], |_: &mut Self| Ok(Some(Msg::AppClose))).unwrap();
+        hk_manager.register(&[Key::Char('j')], |state| {
+            state.component.states.incr_list_index(true);
+            Ok(Some(Msg::None))
+        }).unwrap();
+        hk_manager.register(&[Key::Char('j')], |state| {
+            state.component.states.incr_list_index(true);
+            Ok(Some(Msg::None))
+        }).unwrap();
+
         Self {
+            hk_manager: hk_manager,
             component: tui_realm_stdlib::Table::default()
                 .title("Available connections", Alignment::Left)
                 .highlighted_color(Color::LightYellow)
