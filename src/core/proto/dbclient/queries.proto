@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package dbclient.queries;
+
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+service QueriesService {
+  rpc ExecuteRawQuery(ExecuteRawQueryRequest) returns (ExecuteRawQueryResponse);
+  rpc ListAllItemsFromObject(ListAllItemsFromObjectRequest) returns (ListAllItemsFromObjectResponse);
+  rpc AddRecordToObject(AddRecordToObjectRequest) returns (AddRecordToObjectResponse);
+  rpc UpdateRecordOfObject(UpdateRecordOfObjectRequest) returns (UpdateRecordOfObjectResponse);
+}
+
+message ExecuteRawQueryRequest {
+  common.Object object = 1;
+  string query = 2;
+}
+
+message ExecuteRawQueryResponse {
+  QueryResult result = 1;
+}
+
+message ListAllItemsFromObjectRequest {
+}
+
+message ListAllItemsFromObjectResponse {
+  common.DbRecord record = 1;
+}
+
+message AddRecordToObjectRequest {
+  common.DbRecord record = 1;
+}
+
+message AddRecordToObjectResponse {
+}
+
+message UpdateRecordOfObjectRequest {
+}
+
+message UpdateRecordOfObjectResponse {
+}
+
+message QueryResult {
+  oneof result {
+    string status = 1;
+    common.DbRecord record = 2;
+  }
+}
+

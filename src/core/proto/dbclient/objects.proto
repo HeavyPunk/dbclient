@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package dbclient.objects;
+
+import "connections.proto";
+import "common.proto";
+
+service ObjectsService {
+  rpc GetObjectsOfConnection(GetObjectsOfConnectionRequest) returns (GetObjectsOfConnectionResponse);
+  rpc AddObjectToConnection(AddObjectToConnectionRequest) returns (AddObjectToConnectionResponse);
+}
+
+message GetObjectsOfConnectionRequest {
+  connections.Connection connection = 1;
+}
+
+message GetObjectsOfConnectionResponse {
+  repeated common.Object objects = 1;
+}
+
+message AddObjectToConnectionRequest {
+  connections.Connection connection = 1;
+  common.Object object = 2;
+}
+
+message AddObjectToConnectionResponse {
+}
+
+

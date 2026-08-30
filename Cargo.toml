@@ -19,8 +19,13 @@ tui-realm-stdlib = "3"
 tui-realm-textarea = { git = "https://github.com/g1ibby/tui-realm-textarea.git", rev = "32eb97cf8ee42b306cdb9fb01cb6a327256ec19f", default-features = false, features = [ "clipboard" ] }
 
 chrono = "0.4"
+prost = "0.14"
+prost-types = "0.14"
+anyhow = "1"
 
 #db clients
 redis = { version = "0.31" }
 postgres = { version = "0.19" }
 
+[build-dependencies]
+prost-build = "0.14"

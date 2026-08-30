@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package dbclient.common;
+
+import "google/protobuf/timestamp.proto";
+
+
+message DbRecord {
+  map<string, DbField> fields = 1;
+}
+
+message DbField {
+  oneof field {
+    string str = 1;
+    StringContainer str_container = 2;
+    int32 i8 = 3;
+    int32 i16 = 4;
+    int32 i32 = 5;
+    int64 i64 = 6;
+    bool boolean = 7;
+    google.protobuf.Timestamp datetime = 8;
+  }
+}
+
+message StringContainer {
+  repeated string strs = 1;
+}
+
+message Object {
+  Object prev = 1;
+  string id = 2;
+  string name = 3;
+  string type = 4;
+}

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package dbclient.connections;
+
+service ConnectionsService {
+  rpc GetAvailableList(GetAvailableConnectionsRequest) returns (GetAvailableConnectionsResponse);
+}
+
+message GetAvailableConnectionsRequest {
+}
+
+message GetAvailableConnectionsResponse {
+  repeated Connection connections = 1;
+}
+
+message Connection {
+  string id = 1;
+}
