@@ -4,7 +4,10 @@ use chrono::{DateTime, Utc};
 use dbclient::Field;
 use postgres::{Column, NoTls, Row};
 
-use crate::core::dbclient::{fetcher::{FetchResult, Fetcher, FetcherError}, query_builder::QueryElement};
+use crate::core::dbclient::{
+    fetcher::{FetchResult, Fetcher, FetcherError},
+    query_builder::QueryElement,
+};
 
 pub struct PostgresConfig {
     pub uri: String,
@@ -21,9 +24,7 @@ impl From<postgres::Error> for super::fetcher::FetcherError {
 }
 
 impl Fetcher for PostgresFetcher {
-    fn fetch_db_objects(
-        &mut self,
-    ) -> Result<FetchResult, FetcherError> {
+    fn fetch_db_objects(&mut self) -> Result<FetchResult, FetcherError> {
         let mut client = postgres::Client::connect(&self.config.uri, NoTls)?;
         let query = "
 SELECT

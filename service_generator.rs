@@ -14,6 +14,7 @@ impl ServiceGenerator for AsyncServiceGenerator {
     fn generate(&mut self, service: Service, buf: &mut String) {
         service.comments.append_with_indent(0, buf);
         buf.push_str("#[allow(async_fn_in_trait)]\n");
+        buf.push_str("#[::async_trait::async_trait]\n");
         writeln!(buf, "pub trait {} {{", service.name).unwrap();
 
         for method in service.methods {

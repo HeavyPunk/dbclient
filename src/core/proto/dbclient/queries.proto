@@ -13,7 +13,7 @@ service QueriesService {
 }
 
 message ExecuteRawQueryRequest {
-  common.Object object = 1;
+  common.DbObjectDescriptor object = 1;
   string query = 2;
 }
 
@@ -22,6 +22,7 @@ message ExecuteRawQueryResponse {
 }
 
 message ListAllItemsFromObjectRequest {
+  common.DbObjectDescriptor object = 1;
 }
 
 message ListAllItemsFromObjectResponse {
@@ -29,13 +30,16 @@ message ListAllItemsFromObjectResponse {
 }
 
 message AddRecordToObjectRequest {
-  common.DbRecord record = 1;
+  common.DbObjectDescriptor object = 1;
+  common.DbRecord record = 2;
 }
 
 message AddRecordToObjectResponse {
 }
 
 message UpdateRecordOfObjectRequest {
+  common.DbObjectDescriptor object = 1;
+  common.DbRecord record = 2;
 }
 
 message UpdateRecordOfObjectResponse {

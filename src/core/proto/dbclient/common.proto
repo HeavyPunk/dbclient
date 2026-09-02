@@ -26,9 +26,100 @@ message StringContainer {
   repeated string strs = 1;
 }
 
-message Object {
-  Object prev = 1;
-  string id = 2;
-  string name = 3;
-  string type = 4;
+message DbObject {
+  oneof specification {
+    PostgresObject postgres = 1;
+    RedisObject redis = 2;
+  };
+}
+
+message DbObjectDescriptor {
+  oneof descriptor {
+    PostgresObjectDescriptor postgres = 1;
+  }
+}
+
+message PostgresObject {
+  oneof object {
+    PostgresDatabase database = 1;
+    PostgresSchema schema = 2;
+    PostgresTable table = 3;
+  }
+}
+
+message PostgresObjectDescriptor {
+  oneof descriptor {
+    PostgresDatabaseDescriptor database = 1;
+    PostgresSchemaDescriptor schema = 2;
+    PostgresTableDescriptor table = 3;
+  }
+}
+
+message RedisObject {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    STRING = 1;
+  }
+  string name = 1;
+  Type obj_type = 2;
+}
+
+message PostgresDatabase {
+  PostgresDatabaseDescriptor descriptor = 1;
+  repeated PostgresSchema schemas = 2;
+}
+
+message PostgresDatabaseDescriptor {
+  string name = 1;
+}
+
+message PostgresSchema {
+  PostgresSchemaDescriptor descriptor = 1;
+  repeated PostgresTable tables = 2;
+  repeated PostgresView views = 3;
+  repeated PostgresView materialized_views = 4;
+  repeated PostgresFunction functions = 5;
+}
+
+message PostgresSchemaDescriptor {
+  string name = 1;
+}
+
+message PostgresTable {
+  PostgresTableDescriptor descriptor = 1;
+  repeated PostgresTableColumn columns = 2;
+  repeated PostgresTableConstrain constrains = 3;
+  repeated PostgresTableIndex indexes = 4;
+}
+
+message PostgresTableDescriptor {
+  string name = 1;
+}
+
+message PostgresTableColumn {
+  string name = 1;
+}
+
+message PostgresTableConstrain {
+  string name = 1;
+}
+
+message PostgresTableIndex {
+  string name = 1;
+}
+
+message PostgresView {
+  string name = 1;
+}
+
+message PostgresFunction {
+  string name = 1;
+}
+
+message PostgresAggregate {
+  string name = 1;
+}
+
+message PostgresType {
+  string name = 1;
 }

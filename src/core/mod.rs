@@ -1,5 +1,5 @@
 mod dbclient;
-mod server;
+pub mod server;
 
 pub mod proto {
     pub mod connections {

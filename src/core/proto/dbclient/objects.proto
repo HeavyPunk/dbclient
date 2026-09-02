@@ -15,12 +15,13 @@ message GetObjectsOfConnectionRequest {
 }
 
 message GetObjectsOfConnectionResponse {
-  repeated common.Object objects = 1;
+  repeated common.DbObject objects = 1;
 }
 
 message AddObjectToConnectionRequest {
   connections.Connection connection = 1;
-  common.Object object = 2;
+  common.DbObjectDescriptor destination = 2;
+  common.DbObject object = 3;
 }
 
 message AddObjectToConnectionResponse {

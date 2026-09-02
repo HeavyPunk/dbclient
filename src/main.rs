@@ -1,15 +1,22 @@
+use std::sync::Arc;
+
+use anyhow::{Context, Result};
 use clap::Parser;
 use cli::Cli;
 use config::Config;
-use ui3::model::Model;
+use iocraft::{element, ElementExt};
+use tokio::sync::Mutex;
 
+use crate::ui4::app_state::{AppState, Page};
 mod cli;
 mod config;
+mod core;
 mod dbclient;
 mod ui3;
-mod core;
+mod ui4;
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args = Cli::parse();
 
     let config_content =
@@ -17,6 +24,42 @@ fn main() {
 
     let config: Config = toml::from_str(&config_content).expect("Failed to parse config file");
 
-    // ui2::draw(config);
-    Model::new(&config).main_loop();
+    let connections_client: Arc<dyn core::proto::connections::ConnectionsService + Send + Sync> =
+        Arc::new(core::server::ConnectionsServer::new(
+            config.connections.clone(),
+        ));
+
+    let db_objects_client: Arc<dyn core::proto::objects::ObjectsService + Send + Sync> =
+        Arc::new(core::server::ObjectsServer::new(config.connections));
+    let app_state = Arc::new(Mutex::new(AppState {
+        selected_connection: Some(core::proto::connections::Connection {
+            id: "default".to_string(),
+        }),
+        selected_page: Page::ConnectionsList,
+    }));
+
+    // element!(ui4::db_objects::DbObjects(
+    //     objects_client: Some(db_objects_client),
+    //     state: app_state
+    // ))
+    // .render_loop()
+    // .await
+    // .context("dbclient execution error")
+
+    // element!(ui4::connections_list::ConnectionsList(
+    //     connections_client: Some(connections_client),
+    //     state: app_state,
+    // ))
+    // .render_loop()
+    // .await
+    // .context("dbclient execution error")
+
+    element!(ui4::app_state::AppContainer(
+        connections_client: Some(connections_client),
+        objects_client: Some(db_objects_client),
+        state: app_state,
+    ))
+    .render_loop()
+    .await
+    .context("app container execution error")
 }
