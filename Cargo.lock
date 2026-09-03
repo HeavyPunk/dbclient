@@ -476,6 +476,7 @@ dependencies = [
  "serde",
  "string_cmd",
  "tokio",
+ "tokio-postgres",
  "toml",
  "tui-realm-stdlib",
  "tui-realm-textarea",

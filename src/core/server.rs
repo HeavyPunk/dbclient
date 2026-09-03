@@ -1,7 +1,8 @@
 use std::{collections::HashMap, fmt};
 
 use crate::config::Connection;
-use crate::core::proto::common::db_object::Specification;
+use crate::core::dbclient::connector::{Connector, ConnectorError};
+use crate::core::dbclient::postgresql::connector_impl::PostgresConnector;
 use crate::core::{
     dbclient::{
         dummy::DummyFetcher,
@@ -56,6 +57,7 @@ enum ObjectsServerErrors {
     ValidationError(&'static str),
     ConnectionNotFound,
     FetcherError(FetcherError),
+    ConnectorError(ConnectorError),
 }
 
 impl fmt::Display for ObjectsServerErrors {
@@ -64,6 +66,7 @@ impl fmt::Display for ObjectsServerErrors {
             ObjectsServerErrors::ValidationError(e) => write!(f, "validation error: {}", e),
             ObjectsServerErrors::ConnectionNotFound => write!(f, "connection not found"),
             ObjectsServerErrors::FetcherError(_) => write!(f, "fetcher error"),
+            ObjectsServerErrors::ConnectorError(_) => write!(f, "connector error"),
         }
     }
 }
@@ -85,6 +88,20 @@ impl ObjectsServer {
         Self { conns: conns }
     }
 
+    fn resolve_connector(conn: &Connection) -> Box<dyn Connector> {
+        let conn: Box<_> = match conn.connection_type {
+            crate::config::ConnectionType::Redis => todo!(),
+            crate::config::ConnectionType::Postgres => Box::new(PostgresConnector {
+                config: super::dbclient::postgresql::connector_impl::PostgresConfig {
+                    uri: conn.connection_string.clone(),
+                },
+            }),
+            crate::config::ConnectionType::MySql => todo!(),
+        };
+
+        return conn;
+    }
+
     fn resolve_fetcher(conn: &Connection) -> Box<dyn Fetcher> {
         let fetcher: Box<dyn Fetcher> = match conn.connection_type {
             crate::config::ConnectionType::Redis => Box::new(RedisFetcher {
@@ -102,54 +119,10 @@ impl ObjectsServer {
         return fetcher;
     }
 
-    fn list_objects(conn: &Connection) -> Result<Vec<DbObject>, FetcherError> {
-        Ok(vec![DbObject {
-            specification: Some(Specification::Postgres(proto::common::PostgresObject {
-                object: Some(proto::common::postgres_object::Object::Database(
-                    proto::common::PostgresDatabase {
-                        descriptor: Some(proto::common::PostgresDatabaseDescriptor {
-                            name: "test-database".to_string(),
-                        }),
-                        schemas: vec![proto::common::PostgresSchema {
-                            descriptor: Some(proto::common::PostgresSchemaDescriptor {
-                                name: "public".to_string(),
-                            }),
-                            tables: vec![proto::common::PostgresTable {
-                                descriptor: Some(proto::common::PostgresTableDescriptor {
-                                    name: "some_table".to_string(),
-                                }),
-                                ..Default::default()
-                            }],
-                            ..Default::default()
-                        }],
-                    },
-                )),
-            })),
-        }])
-        // let mut fetcher = ObjectsServer::resolve_fetcher(conn);
-        // let objects = fetcher.fetch_db_objects()?;
-        // if let FetchResult::Table(table) = objects {
-        //     let result = match table {
-        //         Some(x) => x,
-        //         None => (vec![], HashMap::default()),
-        //     };
-        //     let def = (&"".to_string(), &vec![]);
-        //     let list = result.1.iter().last().unwrap_or(def);
-        //     let list = list.1;
-        //
-        //     let mut res = vec![];
-        //     for f in list {
-        //         res.push(DbObject {
-        //             specification: Some(Specification::Postgres(proto::common::PostgresObject { object: None }))
-        //             // prev: None,
-        //             // id: f.as_sql_value(),
-        //             // name: f.as_ui_value(),
-        //             // r#type: "obj".to_string(),
-        //         });
-        //     }
-        //     return Ok(res);
-        // }
-        // return Err(FetcherError::InvalidQuery);
+    async fn list_objects(conn: &Connection) -> Result<Vec<DbObject>, ConnectorError> {
+        let mut conn = ObjectsServer::resolve_connector(conn);
+        let obj = conn.get_objects().await?;
+        Ok(vec![obj])
     }
 
     // fn add_object(conn: &Connection, obj: DbObject) -> Result<(), FetcherError> {
@@ -184,9 +157,9 @@ impl super::proto::objects::ObjectsService for ObjectsServer {
         if let Some(connection) = request.connection {
             let conn = self.conns.get(&connection.id);
             if let Some(conn) = conn {
-                let objs = match Self::list_objects(conn) {
+                let objs = match Self::list_objects(conn).await {
                     Ok(v) => v,
-                    Err(e) => return Err(ObjectsServerErrors::FetcherError(e))?,
+                    Err(e) => return Err(ObjectsServerErrors::ConnectorError(e))?,
                 };
                 Ok(GetObjectsOfConnectionResponse { objects: objs })
             } else {

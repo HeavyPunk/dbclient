@@ -9,6 +9,8 @@ use crate::core::dbclient::{
     query_builder::QueryElement,
 };
 
+pub mod connector_impl;
+
 pub struct PostgresConfig {
     pub uri: String,
 }

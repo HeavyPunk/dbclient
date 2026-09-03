@@ -30,15 +30,16 @@ fn name<T>(descriptor: Option<&T>, get_name: impl FnOnce(&T) -> &str) -> String 
     descriptor.map(get_name).unwrap_or("<unnamed>").to_string()
 }
 
+fn collection_node(name: &str, children: Vec<FileTreeNode>) -> Option<FileTreeNode> {
+    (!children.is_empty()).then(|| FileTreeNode::new(format!("▸ {name}"), children))
+}
+
 fn specification_node(specification: Specification) -> FileTreeNode {
     match specification {
         Specification::Redis(redis) => FileTreeNode::new(format!("Redis: {}", redis.name), vec![]),
         Specification::Postgres(postgres) => match postgres.object {
             Some(Object::Database(database)) => FileTreeNode::new(
-                format!(
-                    "Database: {}",
-                    name(database.descriptor.as_ref(), |d| &d.name)
-                ),
+                format!("⛁ {}", name(database.descriptor.as_ref(), |d| &d.name)),
                 database
                     .schemas
                     .into_iter()
@@ -50,7 +51,7 @@ fn specification_node(specification: Specification) -> FileTreeNode {
                     .collect(),
             ),
             Some(Object::Schema(schema)) => {
-                let mut children = schema
+                let tables = schema
                     .tables
                     .into_iter()
                     .map(|table| {
@@ -58,41 +59,66 @@ fn specification_node(specification: Specification) -> FileTreeNode {
                             object: Some(Object::Table(table)),
                         }))
                     })
-                    .collect::<Vec<_>>();
-                children.extend(
-                    schema
-                        .views
-                        .into_iter()
-                        .map(|view| FileTreeNode::new(format!("View: {}", view.name), vec![])),
-                );
-                children.extend(schema.materialized_views.into_iter().map(|view| {
-                    FileTreeNode::new(format!("Materialized view: {}", view.name), vec![])
-                }));
-                children.extend(schema.functions.into_iter().map(|function| {
-                    FileTreeNode::new(format!("Function: {}", function.name), vec![])
-                }));
+                    .collect();
+                let views = schema
+                    .views
+                    .into_iter()
+                    .map(|view| FileTreeNode::new(format!("◉ {}", view.name), vec![]))
+                    .collect();
+                let materialized_views = schema
+                    .materialized_views
+                    .into_iter()
+                    .map(|view| FileTreeNode::new(format!("◉ {}", view.name), vec![]))
+                    .collect();
+                let functions = schema
+                    .functions
+                    .into_iter()
+                    .map(|function| FileTreeNode::new(format!("ƒ {}", function.name), vec![]))
+                    .collect();
+
+                let children = [
+                    collection_node("Tables", tables),
+                    collection_node("Views", views),
+                    collection_node("Materialized views", materialized_views),
+                    collection_node("Functions", functions),
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+
                 FileTreeNode::new(
-                    format!("Schema: {}", name(schema.descriptor.as_ref(), |d| &d.name)),
+                    format!(" {}", name(schema.descriptor.as_ref(), |d| &d.name)),
                     children,
                 )
             }
             Some(Object::Table(table)) => {
-                let mut children = table
+                let columns = table
                     .columns
                     .into_iter()
-                    .map(|column| FileTreeNode::new(format!("Column: {}", column.name), vec![]))
-                    .collect::<Vec<_>>();
-                children.extend(table.constrains.into_iter().map(|constraint| {
-                    FileTreeNode::new(format!("Constraint: {}", constraint.name), vec![])
-                }));
-                children.extend(
-                    table
-                        .indexes
-                        .into_iter()
-                        .map(|index| FileTreeNode::new(format!("Index: {}", index.name), vec![])),
-                );
+                    .map(|column| FileTreeNode::new(format!("│ {}", column.name), vec![]))
+                    .collect();
+                let constraints = table
+                    .constrains
+                    .into_iter()
+                    .map(|constraint| FileTreeNode::new(format!("⚿ {}", constraint.name), vec![]))
+                    .collect();
+                let indexes = table
+                    .indexes
+                    .into_iter()
+                    .map(|index| FileTreeNode::new(format!("⌕ {}", index.name), vec![]))
+                    .collect();
+
+                let children = [
+                    collection_node("Columns", columns),
+                    collection_node("Constraints", constraints),
+                    collection_node("Indexes", indexes),
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+
                 FileTreeNode::new(
-                    format!("Table: {}", name(table.descriptor.as_ref(), |d| &d.name)),
+                    format!("▤ {}", name(table.descriptor.as_ref(), |d| &d.name)),
                     children,
                 )
             }

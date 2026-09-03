@@ -2,9 +2,9 @@ use std::{collections::HashSet, sync::Arc};
 
 use iocraft::{
     component,
-    components::{Text, View},
+    components::{ScrollView, ScrollViewHandle, Text, View},
     element,
-    hooks::{UseState, UseTerminalEvents},
+    hooks::{UseRef, UseState, UseTerminalEvents},
     AnyElement, Color, FlexDirection, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent,
 };
 use tokio::sync::Mutex;
@@ -71,6 +71,7 @@ pub struct FileTreeProps {
 pub fn FileTree(props: &FileTreeProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut cursor = hooks.use_state(|| 0usize);
     let mut expanded = hooks.use_state(HashSet::<Vec<String>>::new);
+    let mut scroll_handle = hooks.use_ref_default::<ScrollViewHandle>();
     let nodes = props.nodes.clone();
     let selected_path = props.selected_path.clone();
     let visible = flatten(&nodes, &expanded.read());
@@ -83,6 +84,23 @@ pub fn FileTree(props: &FileTreeProps, mut hooks: Hooks) -> impl Into<AnyElement
 
     if let Some(path) = visible.get(cursor.get()).map(|node| node.path.clone()) {
         tokio::task::block_in_place(|| *selected_path.blocking_lock() = Some(path));
+    }
+
+    let cursor_index = cursor.get();
+    let viewport_height = scroll_handle.read().viewport_height() as usize;
+    if viewport_height > 0 {
+        let current_offset = scroll_handle.read().scroll_offset().max(0) as usize;
+        let next_offset = if cursor_index < current_offset {
+            cursor_index
+        } else if cursor_index >= current_offset + viewport_height {
+            cursor_index - viewport_height + 1
+        } else {
+            current_offset
+        };
+
+        if next_offset != current_offset {
+            scroll_handle.write().scroll_to(next_offset as i32);
+        }
     }
 
     let event_visible = visible.clone();
@@ -117,12 +135,16 @@ pub fn FileTree(props: &FileTreeProps, mut hooks: Hooks) -> impl Into<AnyElement
     });
 
     element! {
-        View(flex_direction: FlexDirection::Column) {
-            #(visible.iter().enumerate().map(|(index, node)| element! {
-                View(background_color: if index == cursor.get() { Some(Color::Blue) } else { None }) {
-                    Text(content: format!("{}{} {}", "  ".repeat(node.depth), if node.has_children { "▸" } else { " " }, node.name), color: if index == cursor.get() { Some(Color::White) } else { None })
+        View(width: 100pct, height: 100pct, flex_direction: FlexDirection::Column) {
+            ScrollView(handle: Some(scroll_handle), scrollbar: Some(true), keyboard_scroll: Some(false)) {
+                View(flex_direction: FlexDirection::Column) {
+                    #(visible.iter().enumerate().map(|(index, node)| element! {
+                        View(background_color: if index == cursor.get() { Some(Color::Blue) } else { None }) {
+                            Text(content: format!("{}{} {}", "  ".repeat(node.depth), if node.has_children { "▸" } else { " " }, node.name), color: if index == cursor.get() { Some(Color::Black) } else { None })
+                        }
+                    }))
                 }
-            }))
+            }
         }
     }
 }

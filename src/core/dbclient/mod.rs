@@ -2,6 +2,7 @@
 pub mod dummy;
 pub mod postgresql;
 pub mod redis;
+pub mod connector;
 
 pub mod query_builder;
 
