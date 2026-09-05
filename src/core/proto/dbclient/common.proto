@@ -6,8 +6,28 @@ import "google/protobuf/timestamp.proto";
 
 
 message DbRecord {
-  map<string, DbField> fields = 1;
+  oneof specification {
+    PostgresRecord postgres = 1;
+  }
 }
+
+message PostgresRecord {
+  oneof record {
+    PostgresRecordTable table = 1;
+  }
+}
+
+message PostgresRecordTable {
+  // PostgresTableColumn is column descriptor
+  repeated PostgresRecordTableRow rows = 1;
+}
+
+message PostgresRecordTableRow {
+  repeated PostgresTableColumn columns = 1;
+  repeated DbField values = 2;
+}
+
+// -----------------------------------------
 
 message DbField {
   oneof field {
@@ -82,7 +102,8 @@ message PostgresSchema {
 }
 
 message PostgresSchemaDescriptor {
-  string name = 1;
+  PostgresDatabaseDescriptor upstream_descriptor = 1;
+  string name = 2;
 }
 
 message PostgresTable {
@@ -93,7 +114,8 @@ message PostgresTable {
 }
 
 message PostgresTableDescriptor {
-  string name = 1;
+  PostgresSchemaDescriptor upstream_descriptor = 1;
+  string name = 2;
 }
 
 message PostgresTableColumn {

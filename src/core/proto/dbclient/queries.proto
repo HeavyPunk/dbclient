@@ -3,6 +3,7 @@ syntax = "proto3";
 package dbclient.queries;
 
 import "common.proto";
+import "connections.proto";
 import "google/protobuf/timestamp.proto";
 
 service QueriesService {
@@ -13,8 +14,9 @@ service QueriesService {
 }
 
 message ExecuteRawQueryRequest {
-  common.DbObjectDescriptor object = 1;
-  string query = 2;
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
+  string query = 3;
 }
 
 message ExecuteRawQueryResponse {
@@ -22,7 +24,8 @@ message ExecuteRawQueryResponse {
 }
 
 message ListAllItemsFromObjectRequest {
-  common.DbObjectDescriptor object = 1;
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
 }
 
 message ListAllItemsFromObjectResponse {
@@ -30,16 +33,18 @@ message ListAllItemsFromObjectResponse {
 }
 
 message AddRecordToObjectRequest {
-  common.DbObjectDescriptor object = 1;
-  common.DbRecord record = 2;
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
+  common.DbRecord record = 3;
 }
 
 message AddRecordToObjectResponse {
 }
 
 message UpdateRecordOfObjectRequest {
-  common.DbObjectDescriptor object = 1;
-  common.DbRecord record = 2;
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
+  common.DbRecord record = 3;
 }
 
 message UpdateRecordOfObjectResponse {

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tokio_postgres::NoTls;
 
 use crate::core::{
-    dbclient::connector::{Connector, GetObjectsResult},
+    dbclient::connector::{Connector, GetObjectsResult, ListAllItemsFromObjectResult},
     proto,
 };
 
@@ -187,6 +187,16 @@ impl Connector for PostgresConnector {
                         let key = (schema_name.clone(), table_name.clone());
                         proto::common::PostgresTable {
                             descriptor: Some(proto::common::PostgresTableDescriptor {
+                                upstream_descriptor: Some(
+                                    proto::common::PostgresSchemaDescriptor {
+                                        upstream_descriptor: Some(
+                                            proto::common::PostgresDatabaseDescriptor {
+                                                name: database_name.clone(),
+                                            },
+                                        ),
+                                        name: schema_name.clone(),
+                                    },
+                                ),
                                 name: table_name,
                             }),
                             columns: table_columns
@@ -213,6 +223,9 @@ impl Connector for PostgresConnector {
 
                 proto::common::PostgresSchema {
                     descriptor: Some(proto::common::PostgresSchemaDescriptor {
+                        upstream_descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+                            name: database_name.clone(),
+                        }),
                         name: schema_name.clone(),
                     }),
                     tables: schema_tables,
@@ -252,6 +265,13 @@ impl Connector for PostgresConnector {
                 },
             )),
         })
+    }
+
+    async fn list_all_items_from_object(
+        &mut self,
+    ) -> Result<ListAllItemsFromObjectResult, crate::core::dbclient::connector::ConnectorError>
+    {
+        todo!()
     }
 }
 

@@ -35,6 +35,8 @@ async fn main() -> Result<()> {
         selected_connection: Some(core::proto::connections::Connection {
             id: "default".to_string(),
         }),
+        selected_object: None,
+        query_result_cmd: None,
         selected_page: Page::ConnectionsList,
     }));
 

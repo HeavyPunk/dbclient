@@ -32,9 +32,17 @@ impl Default for Page {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum QueryResultCmd {
+    ExecuteRawQuery,
+    ListAllItemsFromObject,
+}
+
 #[derive(Default)]
 pub struct AppState {
     pub selected_connection: Option<proto::connections::Connection>,
+    pub selected_object: Option<proto::common::DbObjectDescriptor>,
+    pub query_result_cmd: Option<QueryResultCmd>,
     pub selected_page: Page,
 }
 

@@ -1,8 +1,10 @@
 use std::{collections::HashMap, fmt};
 
 use crate::config::Connection;
-use crate::core::dbclient::connector::{Connector, ConnectorError};
+use crate::core::dbclient::connector::{Connector, ConnectorError, ListAllItemsFromObjectResult};
 use crate::core::dbclient::postgresql::connector_impl::PostgresConnector;
+use crate::core::proto::common::DbObjectDescriptor;
+use crate::core::proto::queries::{AddRecordToObjectRequest, AddRecordToObjectResponse, ExecuteRawQueryRequest, ExecuteRawQueryResponse, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResponse, UpdateRecordOfObjectRequest, UpdateRecordOfObjectResponse};
 use crate::core::{
     dbclient::{
         dummy::DummyFetcher,
@@ -195,6 +197,105 @@ impl super::proto::objects::ObjectsService for ObjectsServer {
         //     ))?,
         // }
         unimplemented!()
+    }
+}
+
+
+pub struct QueriesServer {
+    conns: HashMap<String, Connection>,
+}
+
+#[derive(Debug)]
+enum QueriesServerErrors {
+    ValidationError(&'static str),
+    ConnectionNotFound,
+    ConnectorError(ConnectorError),
+}
+
+impl fmt::Display for QueriesServerErrors {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            QueriesServerErrors::ValidationError(e) => write!(f, "validation error: {}", e),
+            QueriesServerErrors::ConnectionNotFound => write!(f, "connection not found"),
+            QueriesServerErrors::ConnectorError(_) => write!(f, "connector error"),
+        }
+    }
+}
+
+impl std::error::Error for QueriesServerErrors {}
+
+impl QueriesServer {
+    pub fn new(connections: Vec<Connection>) -> Self {
+        let mut conns = HashMap::new();
+        for conn in connections {
+            conns.insert(conn.name.clone(), conn);
+        }
+        Self { conns: conns }
+    }
+
+    fn resolve_connector(conn: &Connection) -> Box<dyn Connector> {
+        let conn: Box<_> = match conn.connection_type {
+            crate::config::ConnectionType::Redis => todo!(),
+            crate::config::ConnectionType::Postgres => Box::new(PostgresConnector {
+                config: super::dbclient::postgresql::connector_impl::PostgresConfig {
+                    uri: conn.connection_string.clone(),
+                },
+            }),
+            crate::config::ConnectionType::MySql => todo!(),
+        };
+
+        return conn;
+    }
+
+    async fn list_all_items_of_obj(conn: &Connection, obj: DbObjectDescriptor) -> Result<ListAllItemsFromObjectResult, ConnectorError> {
+        let mut conn = Self::resolve_connector(conn);
+        let items = conn.list_all_items_from_object().await?;
+        Ok(items)
+    }
+}
+
+#[async_trait::async_trait]
+impl super::proto::queries::QueriesService for QueriesServer {
+    async fn execute_raw_query(
+        &self,
+        request: ExecuteRawQueryRequest,
+    ) -> ::anyhow::Result<ExecuteRawQueryResponse> {
+        todo!()
+    }
+    async fn list_all_items_from_object(
+        &self,
+        request: ListAllItemsFromObjectRequest,
+    ) -> ::anyhow::Result<ListAllItemsFromObjectResponse> {
+        match (request.connection, request.object) {
+            (Some(conn), Some(obj)) => {
+                match self.conns.get(&conn.id) {
+                    Some(conn) => {
+                        match Self::list_all_items_of_obj(conn, obj).await {
+                            Ok(r) => {
+                                Ok(ListAllItemsFromObjectResponse {
+                                    record: Some(r)
+                                })
+                            },
+                            Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
+                        }
+                    },
+                    None => Err(QueriesServerErrors::ConnectionNotFound)?
+                }
+            },
+            _ => Err(QueriesServerErrors::ValidationError("connection or object is not defined in request"))?
+        }
+    }
+    async fn add_record_to_object(
+        &self,
+        request: AddRecordToObjectRequest,
+    ) -> ::anyhow::Result<AddRecordToObjectResponse> {
+        todo!()
+    }
+    async fn update_record_of_object(
+        &self,
+        request: UpdateRecordOfObjectRequest,
+    ) -> ::anyhow::Result<UpdateRecordOfObjectResponse> {
+        todo!()
     }
 }
 
