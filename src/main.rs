@@ -30,7 +30,10 @@ async fn main() -> Result<()> {
         ));
 
     let db_objects_client: Arc<dyn core::proto::objects::ObjectsService + Send + Sync> =
-        Arc::new(core::server::ObjectsServer::new(config.connections));
+        Arc::new(core::server::ObjectsServer::new(&config.connections));
+
+    let queries_client: Arc<dyn core::proto::queries::QueriesService + Send + Sync> = 
+        Arc::new(core::server::QueriesServer::new(&config.connections));
     let app_state = Arc::new(Mutex::new(AppState {
         selected_connection: Some(core::proto::connections::Connection {
             id: "default".to_string(),
@@ -59,6 +62,7 @@ async fn main() -> Result<()> {
     element!(ui4::app_state::AppContainer(
         connections_client: Some(connections_client),
         objects_client: Some(db_objects_client),
+        queries_client: Some(queries_client),
         state: app_state,
     ))
     .render_loop()

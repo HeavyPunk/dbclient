@@ -50,6 +50,7 @@ pub struct AppState {
 pub struct AppContainerProps {
     pub connections_client: Option<Arc<dyn proto::connections::ConnectionsService + Send + Sync>>,
     pub objects_client: Option<Arc<dyn proto::objects::ObjectsService + Send + Sync>>,
+    pub queries_client: Option<Arc<dyn proto::queries::QueriesService + Send + Sync>>,
     pub state: Arc<Mutex<AppState>>,
 }
 
@@ -97,6 +98,7 @@ pub fn AppContainer(props: &AppContainerProps, mut hooks: Hooks) -> impl Into<An
                         height,
                     ) {
                         QueryArea(
+                            queries_client: props.queries_client.clone(),
                             objects_client: props.objects_client.clone(),
                             state: props.state.clone()
                         )

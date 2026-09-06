@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
+use prost_types::Timestamp;
 use tokio_postgres::NoTls;
 
 use crate::core::{
-    dbclient::connector::{Connector, GetObjectsResult, ListAllItemsFromObjectResult},
-    proto,
+    dbclient::connector::{Connector, GetObjectsResult, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResult}, proto::{self, common::PostgresObjectDescriptor},
 };
 
 pub struct PostgresConfig {
@@ -269,9 +270,78 @@ impl Connector for PostgresConnector {
 
     async fn list_all_items_from_object(
         &mut self,
+        req: ListAllItemsFromObjectRequest,
     ) -> Result<ListAllItemsFromObjectResult, crate::core::dbclient::connector::ConnectorError>
     {
-        todo!()
+        let (client, connection) = tokio_postgres::connect(&self.config.uri, NoTls).await?;
+        tokio::spawn(async move {
+            if let Err(error) = connection.await {
+                eprintln!("PostgreSQL connection error: {error}");
+            }
+        });
+
+        if let Some(proto::common::db_object_descriptor::Descriptor::Postgres(PostgresObjectDescriptor {descriptor: Some(desc)})) = req.descriptor {
+            let table_name = match desc {
+                proto::common::postgres_object_descriptor::Descriptor::Table(postgres_table_descriptor) => {
+                    postgres_table_descriptor.name
+                },
+                _ => return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest("only list table available"))
+            };
+            let query = format!("SELECT * FROM {}", table_name);
+            let rows = client.query(&query, &[]).await?;
+            let mut proto_rows = vec![];
+            for row in rows {
+                let mut proto_row = proto::common::PostgresRecordTableRow { columns: vec![], values: vec![] };
+                let columns = row.columns();
+                for column in columns {
+                    let name = column.name();
+                    proto_row.columns.push(proto::common::PostgresTableColumn { name: name.to_string() });
+                    let column_name = column.type_().name();
+                    match column_name {
+                        "bool" => {
+                            let value: bool = row.try_get(name)?;
+                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::Boolean(value)) });
+                        }
+                        "int2" => {
+                            let value: i16 = row.try_get(name)?;
+                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::I16(value as i32)) });
+                        }
+                        "int4" => {
+                            let value: i32 = row.try_get(name)?;
+                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::I32(value)) });
+                        }
+                        "int8" => {
+                            let value: i64 = row.try_get(name)?;
+                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::I64(value)) });
+                        }
+                        "varchar" => {
+                            let value: String = row.try_get(name)?;
+                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::Str(value)) });
+                        }
+                        "timestamptz" => {
+                            let value: std::time::SystemTime = row.try_get(name)?;
+                            let datetime: DateTime<Utc> = value.into();
+                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::Datetime(Timestamp {
+                                seconds: datetime.timestamp(),
+                                // TODO: also map nanos
+                                ..Default::default()
+                            })) });
+                        }
+                        _ => return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest("[postgresql] failed to map value")),
+                    }
+                }
+                proto_rows.push(proto_row);
+            }
+            Ok(proto::common::DbRecord {
+                specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
+                    record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
+                        rows: proto_rows
+                    }))
+                }))
+            })
+        } else {
+            return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest("empty descriptor"))
+        }
     }
 }
 

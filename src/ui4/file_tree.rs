@@ -1,4 +1,7 @@
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+};
 
 use iocraft::{
     component,
@@ -7,37 +10,62 @@ use iocraft::{
     hooks::{UseRef, UseState, UseTerminalEvents},
     AnyElement, Color, FlexDirection, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent,
 };
-use tokio::sync::Mutex;
+use tokio::sync::Mutex as TokioMutex;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct FileTreeNode {
-    pub name: String,
-    pub children: Vec<FileTreeNode>,
+#[derive(Clone, Debug)]
+pub struct FileTreeContext<T> {
+    pub path: Vec<String>,
+    pub descriptor: T,
 }
 
-impl FileTreeNode {
-    pub fn new(name: impl Into<String>, children: Vec<FileTreeNode>) -> Self {
+#[derive(Clone, Default)]
+pub struct FileTreeNode<T> {
+    pub name: String,
+    pub children: Vec<FileTreeNode<T>>,
+    context: Option<T>,
+    callback: Option<Arc<Mutex<Box<dyn FnMut(FileTreeContext<T>) + Send>>>>,
+}
+
+impl<T> FileTreeNode<T> {
+    pub fn new(name: impl Into<String>, children: Vec<FileTreeNode<T>>) -> Self {
         Self {
             name: name.into(),
             children,
+            context: None,
+            callback: None,
         }
+    }
+
+    pub fn with_context(mut self, descriptor: T) -> Self {
+        self.context = Some(descriptor);
+        self
+    }
+
+    pub fn on_enter<F>(mut self, callback: F) -> Self
+    where
+        F: FnMut(FileTreeContext<T>) + Send + 'static,
+    {
+        self.callback = Some(Arc::new(Mutex::new(Box::new(callback))));
+        self
     }
 }
 
-#[derive(Clone, Debug)]
-struct VisibleNode {
+#[derive(Clone)]
+struct VisibleNode<T> {
     path: Vec<String>,
     name: String,
     depth: usize,
     has_children: bool,
+    context: Option<T>,
+    callback: Option<Arc<Mutex<Box<dyn FnMut(FileTreeContext<T>) + Send>>>>,
 }
 
-fn flatten_children(
-    nodes: &[FileTreeNode],
+fn flatten_children<T: Clone>(
+    nodes: &[FileTreeNode<T>],
     parent: &[String],
     depth: usize,
     expanded: &HashSet<Vec<String>>,
-    output: &mut Vec<VisibleNode>,
+    output: &mut Vec<VisibleNode<T>>,
 ) {
     for node in nodes {
         let mut path = parent.to_vec();
@@ -48,6 +76,8 @@ fn flatten_children(
             name: node.name.clone(),
             depth,
             has_children,
+            context: node.context.clone(),
+            callback: node.callback.clone(),
         });
         if has_children && expanded.contains(&path) {
             flatten_children(&node.children, &path, depth + 1, expanded, output);
@@ -55,20 +85,26 @@ fn flatten_children(
     }
 }
 
-fn flatten(nodes: &[FileTreeNode], expanded: &HashSet<Vec<String>>) -> Vec<VisibleNode> {
+fn flatten<T: Clone>(
+    nodes: &[FileTreeNode<T>],
+    expanded: &HashSet<Vec<String>>,
+) -> Vec<VisibleNode<T>> {
     let mut output = Vec::new();
     flatten_children(nodes, &[], 0, expanded, &mut output);
     output
 }
 
 #[derive(Default, Props)]
-pub struct FileTreeProps {
-    pub nodes: Vec<FileTreeNode>,
-    pub selected_path: Arc<Mutex<Option<Vec<String>>>>,
+pub struct FileTreeProps<T: Send + Sync> {
+    pub nodes: Vec<FileTreeNode<T>>,
+    pub selected_path: Arc<TokioMutex<Option<Vec<String>>>>,
 }
 
 #[component]
-pub fn FileTree(props: &FileTreeProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+pub fn FileTree<T: Clone + Send + Sync + 'static>(
+    props: &FileTreeProps<T>,
+    mut hooks: Hooks,
+) -> impl Into<AnyElement<'static>> {
     let mut cursor = hooks.use_state(|| 0usize);
     let mut expanded = hooks.use_state(HashSet::<Vec<String>>::new);
     let mut scroll_handle = hooks.use_ref_default::<ScrollViewHandle>();
@@ -117,18 +153,30 @@ pub fn FileTree(props: &FileTreeProps, mut hooks: Hooks) -> impl Into<AnyElement
                 cursor.set((cursor.get() + 1).min(event_visible.len() - 1))
             }
             KeyCode::Up | KeyCode::Char('k') => cursor.set(cursor.get().saturating_sub(1)),
-            KeyCode::Enter | KeyCode::Char(' ') => {
+            KeyCode::Enter => {
                 let node = &event_visible[cursor.get()];
-                let path = node.path.clone();
+                if let Some(callback) = node.callback.clone() {
+                    let Some(descriptor) = node.context.clone() else {
+                        return;
+                    };
+                    if let Ok(mut callback) = callback.lock() {
+                        callback(FileTreeContext {
+                            path: node.path.clone(),
+                            descriptor,
+                        });
+                    }
+                }
+            }
+            KeyCode::Char(' ') => {
+                let node = &event_visible[cursor.get()];
                 if node.has_children {
+                    let path = node.path.clone();
                     let mut next = expanded.read().clone();
-                    if !next.insert(path.clone()) {
-                        next.remove(&path);
+                    if !next.insert(path) {
+                        next.remove(&node.path);
                     }
                     expanded.set(next);
                 }
-                let selected_path = selected_path.clone();
-                tokio::task::block_in_place(|| *selected_path.blocking_lock() = Some(path));
             }
             _ => {}
         }

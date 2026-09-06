@@ -82,10 +82,10 @@ impl From<FetcherError> for ObjectsServerErrors {
 impl std::error::Error for ObjectsServerErrors {}
 
 impl ObjectsServer {
-    pub fn new(connections: Vec<Connection>) -> Self {
+    pub fn new(connections: &Vec<Connection>) -> Self {
         let mut conns = HashMap::new();
         for conn in connections {
-            conns.insert(conn.name.clone(), conn);
+            conns.insert(conn.name.clone(), conn.clone());
         }
         Self { conns: conns }
     }
@@ -225,10 +225,10 @@ impl fmt::Display for QueriesServerErrors {
 impl std::error::Error for QueriesServerErrors {}
 
 impl QueriesServer {
-    pub fn new(connections: Vec<Connection>) -> Self {
+    pub fn new(connections: &Vec<Connection>) -> Self {
         let mut conns = HashMap::new();
         for conn in connections {
-            conns.insert(conn.name.clone(), conn);
+            conns.insert(conn.name.clone(), conn.clone());
         }
         Self { conns: conns }
     }
@@ -248,8 +248,8 @@ impl QueriesServer {
     }
 
     async fn list_all_items_of_obj(conn: &Connection, obj: DbObjectDescriptor) -> Result<ListAllItemsFromObjectResult, ConnectorError> {
-        let mut conn = Self::resolve_connector(conn);
-        let items = conn.list_all_items_from_object().await?;
+        let mut connector = Self::resolve_connector(conn);
+        let items = connector.list_all_items_from_object(obj).await?;
         Ok(items)
     }
 }

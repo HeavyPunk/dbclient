@@ -11,6 +11,7 @@ use crate::{
 #[derive(Default, Props)]
 pub struct QueryAreaProps {
     pub objects_client: Option<Arc<dyn proto::objects::ObjectsService + Send + Sync>>,
+    pub queries_client: Option<Arc<dyn proto::queries::QueriesService + Send + Sync>>,
     pub state: Arc<Mutex<AppState>>,
 }
 
@@ -30,7 +31,8 @@ pub fn QueryArea(props: &QueryAreaProps) -> impl Into<AnyElement<'static>> {
 
             View (width: 70pct) {
                 QueryResult(
-
+                    queries_client: props.queries_client.clone(),
+                    state: props.state.clone()
                 )
             }
         }

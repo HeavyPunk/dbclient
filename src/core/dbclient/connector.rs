@@ -2,14 +2,16 @@ use crate::core::proto;
 
 #[derive(Debug)]
 pub enum ConnectorError {
+    InvalidRequest(&'static str),
     PostgresError(tokio_postgres::Error),
 }
 
 pub type GetObjectsResult = proto::common::DbObject;
+pub type ListAllItemsFromObjectRequest = proto::common::DbObjectDescriptor;
 pub type ListAllItemsFromObjectResult = proto::common::DbRecord;
 
 #[async_trait::async_trait]
 pub trait Connector: Send {
     async fn get_objects(&mut self) -> Result<GetObjectsResult, ConnectorError>;
-    async fn list_all_items_from_object(&mut self) -> Result<ListAllItemsFromObjectResult, ConnectorError>;
+    async fn list_all_items_from_object(&mut self, req: ListAllItemsFromObjectRequest) -> Result<ListAllItemsFromObjectResult, ConnectorError>;
 }
