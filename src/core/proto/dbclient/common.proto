@@ -59,6 +59,8 @@ message DbObjectDescriptor {
   }
 }
 
+// ------------------------------------------
+
 message PostgresObject {
   oneof object {
     PostgresDatabase database = 1;
@@ -120,6 +122,8 @@ message PostgresTableDescriptor {
 
 message PostgresTableColumn {
   string name = 1;
+  // field type descriptor, contains useless value
+  DbField field = 2;
 }
 
 message PostgresTableConstrain {

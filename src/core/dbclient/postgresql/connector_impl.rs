@@ -16,6 +16,24 @@ pub struct PostgresConnector {
     pub config: PostgresConfig,
 }
 
+impl From<&str> for proto::common::DbField {
+    fn from(type_name: &str) -> Self {
+        use proto::common::db_field::Field;
+
+        let field = match type_name {
+            "bool" => Some(Field::Boolean(bool::default())),
+            "int2" => Some(Field::I16(i32::default())),
+            "int4" => Some(Field::I32(i32::default())),
+            "int8" => Some(Field::I64(i64::default())),
+            "varchar" | "text" => Some(Field::Str(String::default())),
+            "timestamptz" => Some(Field::Datetime(Timestamp::default())),
+            _ => None,
+        };
+
+        Self { field }
+    }
+}
+
 impl From<tokio_postgres::Error> for super::super::connector::ConnectorError {
     fn from(value: tokio_postgres::Error) -> Self {
         Self::PostgresError(value)
@@ -100,7 +118,7 @@ impl Connector for PostgresConnector {
         let columns = client
             .query(
                 "
-                SELECT table_schema, table_name, column_name
+                SELECT table_schema, table_name, column_name, udt_name
                 FROM information_schema.columns
                 WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                 ORDER BY table_schema, table_name, ordinal_position
@@ -135,7 +153,7 @@ impl Connector for PostgresConnector {
         let mut view_names: HashMap<String, Vec<String>> = HashMap::new();
         let mut materialized_view_names: HashMap<String, Vec<String>> = HashMap::new();
         let mut function_names: HashMap<String, Vec<String>> = HashMap::new();
-        let mut table_columns: HashMap<(String, String), Vec<String>> = HashMap::new();
+        let mut table_columns: HashMap<(String, String), Vec<(String, String)>> = HashMap::new();
         let mut table_constraints: HashMap<(String, String), Vec<String>> = HashMap::new();
         let mut table_indexes: HashMap<(String, String), Vec<String>> = HashMap::new();
 
@@ -161,7 +179,7 @@ impl Connector for PostgresConnector {
             table_columns
                 .entry((row.get(0), row.get(1)))
                 .or_default()
-                .push(row.get(2));
+                .push((row.get(2), row.get(3)));
         }
         for row in constraints {
             table_constraints
@@ -204,7 +222,12 @@ impl Connector for PostgresConnector {
                                 .remove(&key)
                                 .unwrap_or_default()
                                 .into_iter()
-                                .map(|name| proto::common::PostgresTableColumn { name })
+                                .map(|(name, type_name)| {
+                                    proto::common::PostgresTableColumn {
+                                        name,
+                                        field: Some(type_name.as_str().into()),
+                                    }
+                                })
                                 .collect(),
                             constrains: table_constraints
                                 .remove(&key)
@@ -295,40 +318,42 @@ impl Connector for PostgresConnector {
                 let columns = row.columns();
                 for column in columns {
                     let name = column.name();
-                    proto_row.columns.push(proto::common::PostgresTableColumn { name: name.to_string() });
                     let column_name = column.type_().name();
-                    match column_name {
+                    let value = match column_name {
                         "bool" => {
                             let value: bool = row.try_get(name)?;
-                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::Boolean(value)) });
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::Boolean(value)) }
                         }
                         "int2" => {
                             let value: i16 = row.try_get(name)?;
-                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::I16(value as i32)) });
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::I16(value as i32)) }
                         }
                         "int4" => {
                             let value: i32 = row.try_get(name)?;
-                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::I32(value)) });
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::I32(value)) }
                         }
                         "int8" => {
                             let value: i64 = row.try_get(name)?;
-                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::I64(value)) });
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::I64(value)) }
                         }
                         "varchar" => {
                             let value: String = row.try_get(name)?;
-                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::Str(value)) });
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::Str(value)) }
                         }
                         "timestamptz" => {
                             let value: std::time::SystemTime = row.try_get(name)?;
                             let datetime: DateTime<Utc> = value.into();
-                            proto_row.values.push(proto::common::DbField { field: Some(proto::common::db_field::Field::Datetime(Timestamp {
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::Datetime(Timestamp {
                                 seconds: datetime.timestamp(),
                                 // TODO: also map nanos
                                 ..Default::default()
-                            })) });
+                            })) }
                         }
                         _ => return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest("[postgresql] failed to map value")),
-                    }
+                    };
+                    let field_type = proto::common::DbField::from(column_name);
+                    proto_row.columns.push(proto::common::PostgresTableColumn { name: name.to_string(), field: Some(field_type) });
+                    proto_row.values.push(value);
                 }
                 proto_rows.push(proto_row);
             }

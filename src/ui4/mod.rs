@@ -4,3 +4,4 @@ pub mod db_objects;
 pub mod file_tree;
 pub mod query_area;
 pub mod query_result;
+pub mod forms;
