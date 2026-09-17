@@ -5,7 +5,7 @@ use prost_types::Timestamp;
 use tokio_postgres::NoTls;
 
 use crate::core::{
-    dbclient::connector::{Connector, GetObjectsResult, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResult}, proto::{self, common::PostgresObjectDescriptor},
+    dbclient::connector::{AddRecordToObjectRequest, Connector, GetObjectsResult, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResult}, proto::{self, common::{DbField, PostgresObjectDescriptor, PostgresRecord, PostgresTableDescriptor}},
 };
 
 pub struct PostgresConfig {
@@ -16,21 +16,43 @@ pub struct PostgresConnector {
     pub config: PostgresConfig,
 }
 
-impl From<&str> for proto::common::DbField {
-    fn from(type_name: &str) -> Self {
+impl proto::common::DbField {
+    fn from_pg_type(type_name: &str) -> Self {
         use proto::common::db_field::Field;
 
         let field = match type_name {
-            "bool" => Some(Field::Boolean(bool::default())),
-            "int2" => Some(Field::I16(i32::default())),
-            "int4" => Some(Field::I32(i32::default())),
-            "int8" => Some(Field::I64(i64::default())),
-            "varchar" | "text" => Some(Field::Str(String::default())),
-            "timestamptz" => Some(Field::Datetime(Timestamp::default())),
+            "bool" => Some(Field::Boolean(proto::common::Boolean { boolean: None })),
+            "int2" => Some(Field::I16(proto::common::Int16 { i16: None })),
+            "int4" => Some(Field::I32(proto::common::Int32 { i32: None })),
+            "int8" => Some(Field::I64(proto::common::Int64 { i64: None })),
+            "varchar" | "text" => Some(Field::Str(proto::common::String { str: None })),
+            "timestamptz" => Some(Field::Datetime(proto::common::Timestamp { datetime: None })),
             _ => None,
         };
 
         Self { field }
+    }
+
+    fn into_sql_value(&self) -> Option<String> {
+        use proto::common::db_field::Field;
+
+        match &self.field {
+            Some(Field::Str(proto::common::String { str: Some(s) })) => Some(format!("'{s}'")),
+            Some(Field::StrContainer(proto::common::StringContainer { strs })) => {
+                let s = strs.join("\n");
+                Some(format!("'{s}'"))
+            },
+            Some(Field::I8(proto::common::Int8 { i8: Some(i8) })) => Some(i8.to_string()),
+            Some(Field::I16(proto::common::Int16 { i16: Some(i16) })) => Some(i16.to_string()),
+            Some(Field::I32(proto::common::Int32 { i32: Some(i32) })) => Some(i32.to_string()),
+            Some(Field::I64(proto::common::Int64 { i64: Some(i64) })) => Some(i64.to_string()),
+            Some(Field::Boolean(proto::common::Boolean { boolean: Some(b) })) => Some(b.to_string()),
+            Some(Field::Datetime(proto::common::Timestamp { datetime: Some(timestamp) })) => {
+                let s = timestamp.to_string();
+                Some(format!("'{s}'"))
+            },
+            _ => None,
+        }
     }
 }
 
@@ -225,7 +247,7 @@ impl Connector for PostgresConnector {
                                 .map(|(name, type_name)| {
                                     proto::common::PostgresTableColumn {
                                         name,
-                                        field: Some(type_name.as_str().into()),
+                                        field: Some(DbField::from_pg_type(type_name.as_str())),
                                     }
                                 })
                                 .collect(),
@@ -291,6 +313,105 @@ impl Connector for PostgresConnector {
         })
     }
 
+    async fn get_object(
+        &mut self,
+        req: proto::common::DbObjectDescriptor,
+    ) -> Result<proto::common::DbObject, crate::core::dbclient::connector::ConnectorError> {
+        let descriptor = match req.descriptor {
+            Some(proto::common::db_object_descriptor::Descriptor::Postgres(descriptor)) => {
+                descriptor.descriptor.ok_or(
+                    crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                        "empty PostgreSQL descriptor",
+                    ),
+                )?
+            }
+            None => {
+                return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                    "empty descriptor",
+                ));
+            }
+        };
+
+        let (client, connection) = tokio_postgres::connect(&self.config.uri, NoTls).await?;
+        tokio::spawn(async move {
+            if let Err(error) = connection.await {
+                eprintln!("PostgreSQL connection error: {error}");
+            }
+        });
+
+        let object = match descriptor {
+            proto::common::postgres_object_descriptor::Descriptor::Database(descriptor) => {
+                let current_database: String = client
+                    .query_one("SELECT current_database()", &[])
+                    .await?
+                    .get(0);
+                if current_database != descriptor.name {
+                    return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                        "database not found",
+                    ));
+                }
+
+                load_database_object(&client, current_database).await?
+            }
+            proto::common::postgres_object_descriptor::Descriptor::Schema(descriptor) => {
+                let database = descriptor
+                    .upstream_descriptor
+                    .as_ref()
+                    .ok_or(crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                        "schema database descriptor is required",
+                    ))?;
+                let current_database: String = client
+                    .query_one("SELECT current_database()", &[])
+                    .await?
+                    .get(0);
+                if current_database != database.name {
+                    return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                        "database not found",
+                    ));
+                }
+                let object = load_schema_object(&client, database.name.clone(), descriptor.name).await?;
+                proto::common::DbObject {
+                    specification: Some(proto::common::db_object::Specification::Postgres(
+                        proto::common::PostgresObject {
+                            object: Some(proto::common::postgres_object::Object::Schema(object)),
+                        },
+                    )),
+                }
+            }
+            proto::common::postgres_object_descriptor::Descriptor::Table(descriptor) => {
+                let schema = descriptor
+                    .upstream_descriptor
+                    .ok_or(crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                        "table schema descriptor is required",
+                    ))?;
+                let database = schema.upstream_descriptor.ok_or(
+                    crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                        "table database descriptor is required",
+                    ),
+                )?;
+                let current_database: String = client
+                    .query_one("SELECT current_database()", &[])
+                    .await?
+                    .get(0);
+                if current_database != database.name {
+                    return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                        "database not found",
+                    ));
+                }
+                let table = load_table_object(&client, database.name, schema.name, descriptor.name).await?;
+                proto::common::DbObject {
+                    specification: Some(proto::common::db_object::Specification::Postgres(
+                        proto::common::PostgresObject {
+                            object: Some(proto::common::postgres_object::Object::Table(table)),
+                        },
+                    )),
+                }
+            }
+        };
+
+        Ok(object)
+    }
+
     async fn list_all_items_from_object(
         &mut self,
         req: ListAllItemsFromObjectRequest,
@@ -321,37 +442,51 @@ impl Connector for PostgresConnector {
                     let column_name = column.type_().name();
                     let value = match column_name {
                         "bool" => {
-                            let value: bool = row.try_get(name)?;
-                            proto::common::DbField { field: Some(proto::common::db_field::Field::Boolean(value)) }
+                            let value: Option<bool> = row.try_get(name)?;
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::Boolean(proto::common::Boolean {
+                                boolean: value
+                            }))}
                         }
                         "int2" => {
-                            let value: i16 = row.try_get(name)?;
-                            proto::common::DbField { field: Some(proto::common::db_field::Field::I16(value as i32)) }
+                            let value: Option<i16> = row.try_get(name)?;
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::I16(proto::common::Int16 {
+                                i16: value.map(|v| v as i32)
+                            }))}
                         }
                         "int4" => {
-                            let value: i32 = row.try_get(name)?;
-                            proto::common::DbField { field: Some(proto::common::db_field::Field::I32(value)) }
+                            let value: Option<i32> = row.try_get(name)?;
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::I32(proto::common::Int32 {
+                                i32: value
+                            })) }
                         }
                         "int8" => {
-                            let value: i64 = row.try_get(name)?;
-                            proto::common::DbField { field: Some(proto::common::db_field::Field::I64(value)) }
+                            let value: Option<i64> = row.try_get(name)?;
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::I64(proto::common::Int64 {
+                                i64: value
+                            })) }
                         }
                         "varchar" => {
-                            let value: String = row.try_get(name)?;
-                            proto::common::DbField { field: Some(proto::common::db_field::Field::Str(value)) }
+                            let value: Option<String> = row.try_get(name)?;
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::Str(proto::common::String {
+                                str: value
+                            })) }
                         }
                         "timestamptz" => {
                             let value: std::time::SystemTime = row.try_get(name)?;
                             let datetime: DateTime<Utc> = value.into();
-                            proto::common::DbField { field: Some(proto::common::db_field::Field::Datetime(Timestamp {
-                                seconds: datetime.timestamp(),
-                                // TODO: also map nanos
-                                ..Default::default()
-                            })) }
+                            proto::common::DbField { field: Some(proto::common::db_field::Field::Datetime(proto::common::Timestamp {
+                                datetime: Some(
+                                    Timestamp {
+                                        seconds: datetime.timestamp(),
+                                        // TODO: also map nanos
+                                        ..Default::default()
+                                    }
+                                )
+                            }))}
                         }
                         _ => return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest("[postgresql] failed to map value")),
                     };
-                    let field_type = proto::common::DbField::from(column_name);
+                    let field_type = proto::common::DbField::from_pg_type(column_name);
                     proto_row.columns.push(proto::common::PostgresTableColumn { name: name.to_string(), field: Some(field_type) });
                     proto_row.values.push(value);
                 }
@@ -368,6 +503,258 @@ impl Connector for PostgresConnector {
             return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest("empty descriptor"))
         }
     }
+
+    async fn add_record_to_object(&mut self, req: AddRecordToObjectRequest) -> Result<(), crate::core::dbclient::connector::ConnectorError> {
+        match (req.record.specification, req.descriptor.descriptor) {
+            (
+                Some(proto::common::db_record::Specification::Postgres(
+                        PostgresRecord { record: Some(proto::common::postgres_record::Record::Table(table)) })),
+                Some(proto::common::db_object_descriptor::Descriptor::Postgres(
+                        PostgresObjectDescriptor {
+                            descriptor: Some(proto::common::postgres_object_descriptor::Descriptor::Table(PostgresTableDescriptor { name: table_name, .. }))
+                        }))
+            ) => {
+                //NOTE: on invalid table, whole operation should be rejected
+                for row in &table.rows {
+                    if row.columns.len() != row.values.len() {
+                        return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest("columns and values should have equal size"))
+                    }
+                }
+
+                let (mut client, connection) = tokio_postgres::connect(&self.config.uri, NoTls).await?;
+                tokio::spawn(async move {
+                    if let Err(error) = connection.await {
+                        eprintln!("PostgreSQL connection error: {error}");
+                    }
+                });
+
+                let transaction = client.transaction().await?;
+                for row in &table.rows {
+                    let mut columns = vec![];
+                    let mut fields = vec![];
+                    for (col, field) in row.columns.iter().zip(row.values.iter()) {
+                        let Some(rendered_field) = field.into_sql_value() else {
+                            continue;
+                        };
+                        columns.push(col.name.clone());
+                        fields.push(rendered_field);
+                    }
+                    if fields.is_empty() {
+                        continue;
+                    }
+                    let columns = columns.join(",");
+                    let fields = fields.join(",");
+                    
+                    transaction.execute(&format!("INSERT INTO {} ({}) VALUES ({})", &table_name, &columns, &fields), &[]).await?;
+                }
+                transaction.commit().await?;
+                Ok(())
+            },
+            _ => Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest("passed record and descriptor couldn't be matched"))
+        }
+    }
+}
+
+async fn load_database_object(
+    client: &tokio_postgres::Client,
+    database_name: String,
+) -> Result<proto::common::DbObject, crate::core::dbclient::connector::ConnectorError> {
+    let schemas = client
+        .query(
+            "SELECT schema_name
+             FROM information_schema.schemata
+             WHERE schema_name NOT IN ('pg_catalog', 'information_schema')
+             ORDER BY schema_name",
+            &[],
+        )
+        .await?;
+
+    let mut schema_objects = Vec::with_capacity(schemas.len());
+    for row in schemas {
+        schema_objects.push(load_schema_object(client, database_name.clone(), row.get(0)).await?);
+    }
+
+    Ok(proto::common::DbObject {
+        specification: Some(proto::common::db_object::Specification::Postgres(
+            proto::common::PostgresObject {
+                object: Some(proto::common::postgres_object::Object::Database(
+                    proto::common::PostgresDatabase {
+                        descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+                            name: database_name.clone(),
+                        }),
+                        schemas: schema_objects,
+                    },
+                )),
+            },
+        )),
+    })
+}
+
+async fn load_schema_object(
+    client: &tokio_postgres::Client,
+    database_name: String,
+    schema_name: String,
+) -> Result<proto::common::PostgresSchema, crate::core::dbclient::connector::ConnectorError> {
+    let schema_exists = client
+        .query_opt(
+            "SELECT 1
+             FROM information_schema.schemata
+             WHERE schema_name = $1",
+            &[&schema_name],
+        )
+        .await?
+        .is_some();
+    if !schema_exists {
+        return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+            "schema not found",
+        ));
+    }
+
+    let tables = client
+        .query(
+            "SELECT table_name
+             FROM information_schema.tables
+             WHERE table_schema = $1 AND table_type = 'BASE TABLE'
+             ORDER BY table_name",
+            &[&schema_name],
+        )
+        .await?;
+    let mut table_objects = Vec::with_capacity(tables.len());
+    for row in tables {
+        table_objects.push(
+            load_table_object(client, database_name.clone(), schema_name.clone(), row.get(0)).await?,
+        );
+    }
+
+    let views = client
+        .query(
+            "SELECT table_name
+             FROM information_schema.views
+             WHERE table_schema = $1
+             ORDER BY table_name",
+            &[&schema_name],
+        )
+        .await?
+        .into_iter()
+        .map(|row| proto::common::PostgresView { name: row.get(0) })
+        .collect();
+    let materialized_views = client
+        .query(
+            "SELECT matviewname
+             FROM pg_catalog.pg_matviews
+             WHERE schemaname = $1
+             ORDER BY matviewname",
+            &[&schema_name],
+        )
+        .await?
+        .into_iter()
+        .map(|row| proto::common::PostgresView { name: row.get(0) })
+        .collect();
+    let functions = client
+        .query(
+            "SELECT routine_name
+             FROM information_schema.routines
+             WHERE routine_schema = $1 AND routine_type = 'FUNCTION'
+             ORDER BY routine_name",
+            &[&schema_name],
+        )
+        .await?
+        .into_iter()
+        .map(|row| proto::common::PostgresFunction { name: row.get(0) })
+        .collect();
+
+    Ok(proto::common::PostgresSchema {
+        descriptor: Some(proto::common::PostgresSchemaDescriptor {
+            upstream_descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+                name: database_name,
+            }),
+            name: schema_name,
+        }),
+        tables: table_objects,
+        views,
+        materialized_views,
+        functions,
+    })
+}
+
+async fn load_table_object(
+    client: &tokio_postgres::Client,
+    database_name: String,
+    schema_name: String,
+    table_name: String,
+) -> Result<proto::common::PostgresTable, crate::core::dbclient::connector::ConnectorError> {
+    let table_exists = client
+        .query_opt(
+            "SELECT 1
+             FROM information_schema.tables
+             WHERE table_schema = $1 AND table_name = $2 AND table_type = 'BASE TABLE'",
+            &[&schema_name, &table_name],
+        )
+        .await?
+        .is_some();
+    if !table_exists {
+        return Err(crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+            "table not found",
+        ));
+    }
+
+    let columns = client
+        .query(
+            "SELECT column_name, udt_name
+             FROM information_schema.columns
+             WHERE table_schema = $1 AND table_name = $2
+             ORDER BY ordinal_position",
+            &[&schema_name, &table_name],
+        )
+        .await?
+        .into_iter()
+        .map(|row| {
+            let type_name: String = row.get(1);
+            proto::common::PostgresTableColumn {
+                name: row.get(0),
+                field: Some(proto::common::DbField::from_pg_type(type_name.as_str())),
+            }
+        })
+        .collect();
+    let constrains = client
+        .query(
+            "SELECT constraint_name
+             FROM information_schema.table_constraints
+             WHERE table_schema = $1 AND table_name = $2
+             ORDER BY constraint_name",
+            &[&schema_name, &table_name],
+        )
+        .await?
+        .into_iter()
+        .map(|row| proto::common::PostgresTableConstrain { name: row.get(0) })
+        .collect();
+    let indexes = client
+        .query(
+            "SELECT indexname
+             FROM pg_catalog.pg_indexes
+             WHERE schemaname = $1 AND tablename = $2
+             ORDER BY indexname",
+            &[&schema_name, &table_name],
+        )
+        .await?
+        .into_iter()
+        .map(|row| proto::common::PostgresTableIndex { name: row.get(0) })
+        .collect();
+
+    Ok(proto::common::PostgresTable {
+        descriptor: Some(proto::common::PostgresTableDescriptor {
+            upstream_descriptor: Some(proto::common::PostgresSchemaDescriptor {
+                upstream_descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+                    name: database_name,
+                }),
+                name: schema_name,
+            }),
+            name: table_name,
+        }),
+        columns,
+        constrains,
+        indexes,
+    })
 }
 
 #[cfg(test)]

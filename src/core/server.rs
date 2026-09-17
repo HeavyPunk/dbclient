@@ -1,9 +1,10 @@
 use std::{collections::HashMap, fmt};
 
 use crate::config::Connection;
-use crate::core::dbclient::connector::{Connector, ConnectorError, ListAllItemsFromObjectResult};
+use crate::core::dbclient::connector::{self, Connector, ConnectorError, GetObjectRequest, ListAllItemsFromObjectResult};
 use crate::core::dbclient::postgresql::connector_impl::PostgresConnector;
-use crate::core::proto::common::DbObjectDescriptor;
+use crate::core::proto::common::{DbObjectDescriptor, DbRecord};
+use crate::core::proto::objects::{GetObjectOfDecriptorRequest, GetObjectOfDecriptorResponse};
 use crate::core::proto::queries::{AddRecordToObjectRequest, AddRecordToObjectResponse, ExecuteRawQueryRequest, ExecuteRawQueryResponse, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResponse, UpdateRecordOfObjectRequest, UpdateRecordOfObjectResponse};
 use crate::core::{
     dbclient::{
@@ -104,27 +105,15 @@ impl ObjectsServer {
         return conn;
     }
 
-    fn resolve_fetcher(conn: &Connection) -> Box<dyn Fetcher> {
-        let fetcher: Box<dyn Fetcher> = match conn.connection_type {
-            crate::config::ConnectionType::Redis => Box::new(RedisFetcher {
-                config: RedisConfig {
-                    uri: conn.connection_string.clone(),
-                },
-            }),
-            crate::config::ConnectionType::Postgres => Box::new(PostgresFetcher {
-                config: PostgresConfig {
-                    uri: conn.connection_string.clone(),
-                },
-            }),
-            crate::config::ConnectionType::MySql => Box::new(DummyFetcher::new()),
-        };
-        return fetcher;
-    }
-
     async fn list_objects(conn: &Connection) -> Result<Vec<DbObject>, ConnectorError> {
         let mut conn = ObjectsServer::resolve_connector(conn);
         let obj = conn.get_objects().await?;
         Ok(vec![obj])
+    }
+
+    async fn get_object(conn: &Connection, desc: DbObjectDescriptor) -> Result<DbObject, ConnectorError> {
+        let mut conn = Self::resolve_connector(conn);
+        return Ok(conn.get_object(desc).await?);
     }
 
     // fn add_object(conn: &Connection, obj: DbObject) -> Result<(), FetcherError> {
@@ -198,6 +187,27 @@ impl super::proto::objects::ObjectsService for ObjectsServer {
         // }
         unimplemented!()
     }
+
+    async fn get_object_of_decriptor(
+        &self,
+        request: GetObjectOfDecriptorRequest,
+    ) -> ::anyhow::Result<GetObjectOfDecriptorResponse> {
+        match (request.connection.as_ref(), request.descriptor.as_ref()) {
+            (Some(conn), Some(desc)) => {
+                let conn = self.conns.get(&conn.id);
+                if conn.is_none() {
+                    return Err(ObjectsServerErrors::ConnectionNotFound)?;
+                }
+                match Self::get_object(conn.unwrap(), desc.clone()).await {
+                    Ok(obj) => Ok(GetObjectOfDecriptorResponse {
+                        object: Some(obj)
+                    }),
+                    Err(e) => Err(ObjectsServerErrors::ConnectorError(e))?,
+                }
+            },
+            _ => Err(ObjectsServerErrors::ValidationError("connection and descriptor are required"))?
+        }
+    }
 }
 
 
@@ -252,6 +262,14 @@ impl QueriesServer {
         let items = connector.list_all_items_from_object(obj).await?;
         Ok(items)
     }
+
+    async fn _add_record_to_object(conn: &Connection, desc: DbObjectDescriptor, record: DbRecord) -> Result<(), ConnectorError> {
+        let mut conn = Self::resolve_connector(conn);
+        return Ok(conn.add_record_to_object(connector::AddRecordToObjectRequest {
+            descriptor: desc,
+            record: record
+        }).await?)
+    }
 }
 
 #[async_trait::async_trait]
@@ -289,7 +307,20 @@ impl super::proto::queries::QueriesService for QueriesServer {
         &self,
         request: AddRecordToObjectRequest,
     ) -> ::anyhow::Result<AddRecordToObjectResponse> {
-        todo!()
+        match (request.connection, request.object, request.record) {
+            (Some(conn), Some(obj), Some(record)) => {
+                match self.conns.get(&conn.id) {
+                    Some(conn) => {
+                        match Self::_add_record_to_object(conn, obj, record).await {
+                            Ok(_) => Ok(AddRecordToObjectResponse {  }),
+                            Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
+                        }
+                    },
+                    None => Err(QueriesServerErrors::ConnectionNotFound)?
+                }
+            },
+            _ => Err(QueriesServerErrors::ValidationError("connection or object or record is not defined in the request"))?
+        }
     }
     async fn update_record_of_object(
         &self,

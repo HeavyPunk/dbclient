@@ -98,6 +98,7 @@ fn flatten<T: Clone>(
 pub struct FileTreeProps<T: Send + Sync> {
     pub nodes: Vec<FileTreeNode<T>>,
     pub selected_path: Arc<TokioMutex<Option<Vec<String>>>>,
+    pub has_focus: bool,
 }
 
 #[component]
@@ -140,7 +141,12 @@ pub fn FileTree<T: Clone + Send + Sync + 'static>(
     }
 
     let event_visible = visible.clone();
+    let has_focus = props.has_focus;
     hooks.use_local_terminal_events(move |event| {
+        if !has_focus {
+            return;
+        }
+
         let TerminalEvent::Key(KeyEvent { code, kind, .. }) = event else {
             return;
         };

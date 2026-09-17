@@ -32,6 +32,7 @@ pub fn QueryArea(props: &QueryAreaProps) -> impl Into<AnyElement<'static>> {
             View (width: 70pct) {
                 QueryResult(
                     queries_client: props.queries_client.clone(),
+                    objects_client: props.objects_client.clone(),
                     state: props.state.clone()
                 )
             }

@@ -20,10 +20,17 @@ pub enum Page {
     QueryArea,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Widget {
     DbObjects,
     QueryResult,
+    AnyPopup,
+}
+
+impl Default for Widget {
+    fn default() -> Self {
+        Self::DbObjects
+    }
 }
 
 impl Default for Page {
@@ -32,10 +39,12 @@ impl Default for Page {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum QueryResultCmd {
     ExecuteRawQuery,
     ListAllItemsFromObject,
+    AddRecordToObject(proto::common::DbRecord),
+    ClosePopup
 }
 
 #[derive(Default)]
@@ -44,6 +53,7 @@ pub struct AppState {
     pub selected_object: Option<proto::common::DbObjectDescriptor>,
     pub query_result_cmd: Option<QueryResultCmd>,
     pub selected_page: Page,
+    pub focus_widget: Widget,
 }
 
 #[derive(Default, Props)]

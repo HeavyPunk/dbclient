@@ -1,11 +1,7 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use iocraft::{
-    component,
-    components::{BorderStyle, View},
-    element,
-    hooks::{UseFuture, UseState},
-    AnyElement, Color, Hooks, Props,
+    AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent, component, components::{BorderStyle, View}, element, hooks::{UseFuture, UseState, UseTerminalEvents},
 };
 use tokio::sync::Mutex;
 
@@ -13,10 +9,8 @@ use crate::{
     core::proto::{
         self,
         common::{self, db_object::Specification, postgres_object::Object},
-    },
-    ui4::{
-        app_state::AppState,
-        file_tree::{FileTree, FileTreeNode},
+    }, ui4::{
+        app_state::{AppState, Widget}, file_tree::{FileTree, FileTreeNode},
     },
 };
 
@@ -176,6 +170,19 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
     let objects = hooks.use_state(Vec::<common::DbObject>::new);
     let selected_path = hooks.use_state(|| Arc::new(Mutex::new(None::<Vec<String>>)));
     let state = props.state.clone();
+    let has_focus = hooks.use_state(|| false);
+
+    let focus_state = props.state.clone();
+    let mut focus = has_focus;
+    hooks.use_future(async move {
+        loop {
+            let is_focused = focus_state.lock().await.focus_widget == Widget::DbObjects;
+            if focus.get() != is_focused {
+                focus.set(is_focused);
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    });
 
     if let Some(client) = props.objects_client.clone() {
         let mut objects = objects.clone();
@@ -200,9 +207,35 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
         .cloned()
         .filter_map(|obj| object_node(obj, props.state.clone()))
         .collect();
+
+    let state = props.state.clone();
+    hooks.use_local_terminal_events(move |event| {
+        let TerminalEvent::Key(KeyEvent { code, kind, .. }) = event else {
+            return;
+        };
+        if kind == KeyEventKind::Release {
+            return;
+        }
+        let mut state = tokio::task::block_in_place(|| state.blocking_lock());
+        if state.focus_widget != Widget::DbObjects {
+            return;
+        }
+
+        match code {
+            KeyCode::Char('l') => {
+                state.focus_widget = Widget::QueryResult;
+            },
+            _ => {}
+        };
+    });
+
     element! {
         View(width: 100pct, height: 100pct, border_style: BorderStyle::Round, border_color: Color::Cyan) {
-            FileTree::<common::PostgresObjectDescriptor>(nodes: nodes, selected_path: selected_path.read().clone())
+            FileTree::<common::PostgresObjectDescriptor>(
+                nodes: nodes,
+                selected_path: selected_path.read().clone(),
+                has_focus: has_focus.get(),
+            )
         }
     }
 }

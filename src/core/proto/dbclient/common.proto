@@ -31,19 +31,47 @@ message PostgresRecordTableRow {
 
 message DbField {
   oneof field {
-    string str = 1;
+    String str = 1;
     StringContainer str_container = 2;
-    int32 i8 = 3;
-    int32 i16 = 4;
-    int32 i32 = 5;
-    int64 i64 = 6;
-    bool boolean = 7;
-    google.protobuf.Timestamp datetime = 8;
+    Int8 i8 = 3;
+    Int16 i16 = 4;
+    Int32 i32 = 5;
+    Int64 i64 = 6;
+    Boolean boolean = 7;
+    Timestamp datetime = 8;
   }
+}
+
+message String {
+  optional string str = 1;
 }
 
 message StringContainer {
   repeated string strs = 1;
+}
+
+message Int8 {
+  optional int32 i8 = 1;
+}
+
+message Int16 {
+  optional int32 i16 = 1;
+}
+
+message Int32 {
+  optional int32 i32 = 1;
+}
+
+message Int64 {
+  optional int64 i64 = 1;
+}
+
+message Boolean {
+  optional bool boolean = 1;
+}
+
+message Timestamp {
+  optional google.protobuf.Timestamp datetime = 1;
 }
 
 message DbObject {

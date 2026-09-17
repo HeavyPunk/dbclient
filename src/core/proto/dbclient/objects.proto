@@ -8,6 +8,7 @@ import "common.proto";
 service ObjectsService {
   rpc GetObjectsOfConnection(GetObjectsOfConnectionRequest) returns (GetObjectsOfConnectionResponse);
   rpc AddObjectToConnection(AddObjectToConnectionRequest) returns (AddObjectToConnectionResponse);
+  rpc GetObjectOfDecriptor(GetObjectOfDecriptorRequest) returns (GetObjectOfDecriptorResponse);
 }
 
 message GetObjectsOfConnectionRequest {
@@ -25,6 +26,15 @@ message AddObjectToConnectionRequest {
 }
 
 message AddObjectToConnectionResponse {
+}
+
+message GetObjectOfDecriptorRequest {
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor descriptor = 2;
+}
+
+message GetObjectOfDecriptorResponse {
+  common.DbObject object = 3;
 }
 
 

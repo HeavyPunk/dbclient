@@ -7,7 +7,7 @@ use config::Config;
 use iocraft::{element, ElementExt};
 use tokio::sync::Mutex;
 
-use crate::ui4::app_state::{AppState, Page};
+use crate::{core::proto, ui4::app_state::{AppState, Page}};
 mod cli;
 mod config;
 mod core;
@@ -41,23 +41,8 @@ async fn main() -> Result<()> {
         selected_object: None,
         query_result_cmd: None,
         selected_page: Page::ConnectionsList,
+        focus_widget: ui4::app_state::Widget::default()
     }));
-
-    // element!(ui4::db_objects::DbObjects(
-    //     objects_client: Some(db_objects_client),
-    //     state: app_state
-    // ))
-    // .render_loop()
-    // .await
-    // .context("dbclient execution error")
-
-    // element!(ui4::connections_list::ConnectionsList(
-    //     connections_client: Some(connections_client),
-    //     state: app_state,
-    // ))
-    // .render_loop()
-    // .await
-    // .context("dbclient execution error")
 
     element!(ui4::app_state::AppContainer(
         connections_client: Some(connections_client),
@@ -68,4 +53,33 @@ async fn main() -> Result<()> {
     .render_loop()
     .await
     .context("app container execution error")
+
+    // element!(ui4::forms::add_record_to_object::AddRecordToObjectForm(
+    //     object: proto::common::DbObject {
+    //         specification: Some(proto::common::db_object::Specification::Postgres(proto::common::PostgresObject {
+    //             object: Some(proto::common::postgres_object::Object::Table(proto::common::PostgresTable {
+    //                 descriptor: None,
+    //                 columns: vec![
+    //                     proto::common::PostgresTableColumn {
+    //                         name: "field-name-1".to_string(),
+    //                         field: Some(proto::common::DbField {
+    //                             field: Some(proto::common::db_field::Field::I8(5))
+    //                         })
+    //                     },
+    //                     proto::common::PostgresTableColumn {
+    //                         name: "field-name-2".to_string(),
+    //                         field: Some(proto::common::DbField {
+    //                             field: Some(proto::common::db_field::Field::Str("hahaha".to_string()))
+    //                         })
+    //                     },
+    //                 ],
+    //                 constrains: vec![],
+    //                 indexes: vec![]
+    //             }))
+    //         }))
+    //     }
+    // ))
+    // .render_loop()
+    // .await
+    // .context("app container execution error")
 }
