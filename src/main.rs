@@ -7,7 +7,10 @@ use config::Config;
 use iocraft::{element, ElementExt};
 use tokio::sync::Mutex;
 
-use crate::{core::proto, ui4::app_state::{AppState, Page}};
+use crate::{
+    core::proto,
+    ui4::app_state::{AppState, Page},
+};
 mod cli;
 mod config;
 mod core;
@@ -32,7 +35,7 @@ async fn main() -> Result<()> {
     let db_objects_client: Arc<dyn core::proto::objects::ObjectsService + Send + Sync> =
         Arc::new(core::server::ObjectsServer::new(&config.connections));
 
-    let queries_client: Arc<dyn core::proto::queries::QueriesService + Send + Sync> = 
+    let queries_client: Arc<dyn core::proto::queries::QueriesService + Send + Sync> =
         Arc::new(core::server::QueriesServer::new(&config.connections));
     let app_state = Arc::new(Mutex::new(AppState {
         selected_connection: Some(core::proto::connections::Connection {
@@ -41,7 +44,7 @@ async fn main() -> Result<()> {
         selected_object: None,
         query_result_cmd: None,
         selected_page: Page::ConnectionsList,
-        focus_widget: ui4::app_state::Widget::default()
+        focus_widget: ui4::app_state::Widget::default(),
     }));
 
     element!(ui4::app_state::AppContainer(

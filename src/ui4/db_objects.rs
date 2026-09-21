@@ -1,7 +1,11 @@
 use std::{sync::Arc, time::Duration};
 
 use iocraft::{
-    AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent, component, components::{BorderStyle, View}, element, hooks::{UseFuture, UseState, UseTerminalEvents},
+    component,
+    components::{BorderStyle, View},
+    element,
+    hooks::{UseFuture, UseState, UseTerminalEvents},
+    AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent,
 };
 use tokio::sync::Mutex;
 
@@ -9,8 +13,10 @@ use crate::{
     core::proto::{
         self,
         common::{self, db_object::Specification, postgres_object::Object},
-    }, ui4::{
-        app_state::{AppState, Widget}, file_tree::{FileTree, FileTreeNode},
+    },
+    ui4::{
+        app_state::{AppState, Widget},
+        file_tree::{FileTree, FileTreeNode},
     },
 };
 
@@ -32,7 +38,9 @@ fn collection_node(name: &str, children: Vec<DbFileTreeNode>) -> Option<DbFileTr
 
 fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>) -> DbFileTreeNode {
     match specification {
-        Specification::Redis(redis) => DbFileTreeNode::new(format!("Redis: {}", redis.name), vec![]),
+        Specification::Redis(redis) => {
+            DbFileTreeNode::new(format!("Redis: {}", redis.name), vec![])
+        }
         Specification::Postgres(postgres) => match postgres.object {
             Some(Object::Database(database)) => {
                 let mut node = DbFileTreeNode::new(
@@ -41,19 +49,20 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
                         .schemas
                         .into_iter()
                         .map(|schema| {
-                            specification_node(Specification::Postgres(
-                                proto::common::PostgresObject {
+                            specification_node(
+                                Specification::Postgres(proto::common::PostgresObject {
                                     object: Some(Object::Schema(schema)),
-                                },
-                            ), state.clone())
+                                }),
+                                state.clone(),
+                            )
                         })
                         .collect(),
                 );
                 if let Some(descriptor) = database.descriptor {
                     node = node.with_context(common::PostgresObjectDescriptor {
-                        descriptor: Some(
-                            common::postgres_object_descriptor::Descriptor::Database(descriptor),
-                        ),
+                        descriptor: Some(common::postgres_object_descriptor::Descriptor::Database(
+                            descriptor,
+                        )),
                     });
                 }
                 node
@@ -64,9 +73,12 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
                     .tables
                     .into_iter()
                     .map(|table| {
-                        specification_node(Specification::Postgres(proto::common::PostgresObject {
-                            object: Some(Object::Table(table)),
-                        }), state.clone())
+                        specification_node(
+                            Specification::Postgres(proto::common::PostgresObject {
+                                object: Some(Object::Table(table)),
+                            }),
+                            state.clone(),
+                        )
                     })
                     .collect();
                 let views = schema
@@ -101,9 +113,9 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
                 );
                 if let Some(descriptor) = schema_descriptor {
                     node = node.with_context(common::PostgresObjectDescriptor {
-                        descriptor: Some(
-                            common::postgres_object_descriptor::Descriptor::Schema(descriptor),
-                        ),
+                        descriptor: Some(common::postgres_object_descriptor::Descriptor::Schema(
+                            descriptor,
+                        )),
                     });
                 }
                 node
@@ -140,19 +152,23 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
                     children,
                 );
                 if let Some(descriptor) = table_descriptor {
-                    node = node.with_context(common::PostgresObjectDescriptor {
-                        descriptor: Some(
-                            common::postgres_object_descriptor::Descriptor::Table(descriptor),
-                        ),
-                    })
-                    .on_enter(move |ctx| {
-                        let desc = ctx.descriptor;
-                        let mut state = tokio::task::block_in_place(|| state.blocking_lock());
-                        state.selected_object = Some(common::DbObjectDescriptor {
-                            descriptor: Some(common::db_object_descriptor::Descriptor::Postgres(desc))
+                    node = node
+                        .with_context(common::PostgresObjectDescriptor {
+                            descriptor: Some(
+                                common::postgres_object_descriptor::Descriptor::Table(descriptor),
+                            ),
+                        })
+                        .on_enter(move |ctx| {
+                            let desc = ctx.descriptor;
+                            let mut state = tokio::task::block_in_place(|| state.blocking_lock());
+                            state.selected_object = Some(common::DbObjectDescriptor {
+                                descriptor: Some(
+                                    common::db_object_descriptor::Descriptor::Postgres(desc),
+                                ),
+                            });
+                            state.query_result_cmd =
+                                Some(super::app_state::QueryResultCmd::ListAllItemsFromObject)
                         });
-                        state.query_result_cmd = Some(super::app_state::QueryResultCmd::ListAllItemsFromObject)
-                    });
                 }
                 node
             }
@@ -162,7 +178,9 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
 }
 
 fn object_node(object: common::DbObject, state: Arc<Mutex<AppState>>) -> Option<DbFileTreeNode> {
-    object.specification.map(|spec| specification_node(spec, state))
+    object
+        .specification
+        .map(|spec| specification_node(spec, state))
 }
 
 #[component]
@@ -224,7 +242,7 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
         match code {
             KeyCode::Char('l') => {
                 state.focus_widget = Widget::QueryResult;
-            },
+            }
             _ => {}
         };
     });

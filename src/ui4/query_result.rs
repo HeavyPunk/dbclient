@@ -1,11 +1,21 @@
 use std::{sync::Arc, time::Duration};
 
 use iocraft::{
-    AlignContent, AnyElement, Color, Edges, FlexDirection, Hooks, KeyCode, KeyEvent, KeyEventKind, Position, Props, component, components::{BorderStyle, Text, View}, element, hooks::{UseFuture, UseState, UseTerminalEvents},
+    component,
+    components::{BorderStyle, Text, View},
+    element,
+    hooks::{UseFuture, UseState, UseTerminalEvents},
+    AlignContent, AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Position, Props,
 };
 use tokio::sync::Mutex;
 
-use crate::{core::proto::{self, common::DbRecord}, ui4::{app_state::{AppState, QueryResultCmd}, forms::add_record_to_object::AddRecordToObjectForm}};
+use crate::{
+    core::proto::{
+        self, common::{DbRecord, PostgresRecordTableRow, db_field::Field},
+    }, ui4::{
+        app_state::{AppState, QueryResultCmd}, components::table_view::{TableView, table_key_handler}, forms::add_record_to_object::AddRecordToObjectForm,
+    },
+};
 
 #[derive(Default, Props)]
 pub struct QueryResultProps {
@@ -20,7 +30,7 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
     let queries_client = props.queries_client.clone();
     let db_object_client = props.objects_client.clone();
     let mut selected_object = hooks.use_state(|| None);
-
+    let selected_row = hooks.use_state(|| Arc::new(Mutex::new(None::<usize>)));
 
     let mut render_add_record_to_object_widget = hooks.use_state(|| false);
     let mut add_record_to_object_widget_data_loaded = hooks.use_state(|| false);
@@ -34,39 +44,82 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
             match &state.query_result_cmd {
                 Some(QueryResultCmd::ExecuteRawQuery) => {
                     todo!()
-                },
+                }
                 Some(QueryResultCmd::ListAllItemsFromObject) => {
-                    match (&queries_client, &state.selected_connection, &state.selected_object) {
+                    match (
+                        &queries_client,
+                        &state.selected_connection,
+                        &state.selected_object,
+                    ) {
                         (Some(client), Some(selected_connection), Some(selected_object)) => {
-                            let resp = client.list_all_items_from_object(proto::queries::ListAllItemsFromObjectRequest{
-                                connection: Some(selected_connection.clone()),
-                                object: Some(selected_object.clone())
-                            }).await;
+                            let resp = client
+                                .list_all_items_from_object(
+                                    proto::queries::ListAllItemsFromObjectRequest {
+                                        connection: Some(selected_connection.clone()),
+                                        object: Some(selected_object.clone()),
+                                    },
+                                )
+                                .await;
                             if let Ok(resp) = resp {
                                 if resp.record.is_some() {
                                     to_visualize.set(resp.record.unwrap());
                                 }
                             }
-                        },
-                        _ => {/* cannot perform operation */}
+                        }
+                        _ => { /* cannot perform operation */ }
                     }
-                },
+                }
                 Some(QueryResultCmd::AddRecordToObject(record)) => {
-                    match (&queries_client, &state.selected_connection, &state.selected_object) {
+                    match (
+                        &queries_client,
+                        &state.selected_connection,
+                        &state.selected_object,
+                    ) {
                         (Some(client), Some(selected_connection), Some(selected_object)) => {
-                            let r = client.add_record_to_object(proto::queries::AddRecordToObjectRequest {
-                                connection: Some(selected_connection.clone()),
-                                object: Some(selected_object.clone()),
-                                record: Some(record.clone())
-                            }).await;
+                            let _r = client
+                                .add_record_to_object(proto::queries::AddRecordToObjectRequest {
+                                    connection: Some(selected_connection.clone()),
+                                    object: Some(selected_object.clone()),
+                                    record: Some(record.clone()),
+                                })
+                                .await;
                             // TODO: log if error + restore records from object after operation done
-                            // dbg!(r);
-                        },
+                        }
                         _ => {}
                     }
                     state.query_result_cmd = Some(QueryResultCmd::ClosePopup);
                     continue;
-                    // render_add_record_to_object_widget.set(false);
+                }
+                Some(QueryResultCmd::RemoveRecordFromObject(record)) => {
+                    match (&queries_client, &state.selected_connection, &state.selected_object) {
+                        (Some(client), Some(selected_connection), Some(selected_object)) => {
+                            let _r = client
+                                .remove_record_from_object(proto::queries::RemoveRecordFromObjectRequest {
+                                    connection: Some(selected_connection.clone()),
+                                    object: Some(selected_object.clone()),
+                                    record: Some(record.clone())
+                                })
+                            .await;
+                            // TODO: log if error + restore records from object after operation done
+                        },
+                        _ => {}
+                    }
+                }
+                Some(QueryResultCmd::UpdateRecordOfObject(old_record, new_record)) => {
+                    match (&queries_client, &state.selected_connection, &state.selected_object) {
+                        (Some(client), Some(selected_connection), Some(selected_object)) => {
+                            let _r = client
+                                .update_record_of_object(proto::queries::UpdateRecordOfObjectRequest {
+                                    connection: Some(selected_connection.clone()),
+                                    object: Some(selected_object.clone()),
+                                    old_record: Some(old_record.clone()),
+                                    new_record: Some(new_record.clone()),
+                                })
+                            .await;
+                            // TODO: log if error + restore records from object after operation done
+                        },
+                        _ => {}
+                    }
                 }
                 Some(QueryResultCmd::ClosePopup) => {
                     selected_object.set(None);
@@ -83,22 +136,25 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
     hooks.use_future(async move {
         loop {
             tokio::time::sleep(Duration::from_millis(50)).await;
-            if render_add_record_to_object_widget.get() && !add_record_to_object_widget_data_loaded.get() {
+            if render_add_record_to_object_widget.get()
+                && !add_record_to_object_widget_data_loaded.get()
+            {
                 let state = state_for_add_add_record_to_object_widget.lock().await;
                 match &db_object_client {
                     Some(cli) => {
-                        let obj = cli.get_object_of_decriptor(proto::objects::GetObjectOfDecriptorRequest {
-                            connection: state.selected_connection.clone(),
-                            descriptor: state.selected_object.clone()
-                        }).await;
+                        let obj = cli
+                            .get_object_of_decriptor(proto::objects::GetObjectOfDecriptorRequest {
+                                connection: state.selected_connection.clone(),
+                                descriptor: state.selected_object.clone(),
+                            })
+                            .await;
                         if let Ok(r) = obj {
                             selected_object.set(r.object);
-                        } else 
-                        {
+                        } else {
                             panic!("Error: {:?}", obj) // TODO: add log here if error
                         }
-                    },
-                    None => {},
+                    }
+                    None => {}
                 };
                 add_record_to_object_widget_data_loaded.set(true);
             }
@@ -123,7 +179,7 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                 render_add_record_to_object_widget.set(true);
                 add_record_to_object_widget_data_loaded.set(false);
                 state.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
-            },
+            }
             KeyCode::Char('h') => {
                 state.focus_widget = crate::ui4::app_state::Widget::DbObjects;
             }
@@ -131,7 +187,6 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
         }
     });
 
-    let form_state = props.state.clone();
     element! {
         View(
             width: 100pct,
@@ -143,6 +198,7 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
             #(
                 match (render_add_record_to_object_widget.get(), selected_object.read().as_ref()) {
                     (true, Some(obj)) => {
+                        let form_state = props.state.clone();
                         element! {
                             View(
                                 position: Position::Absolute,
@@ -169,58 +225,56 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                 match to_visualize.read().specification.as_ref() {
                     Some(proto::common::db_record::Specification::Postgres(postgres_record)) => {
                         element! {
-                            View (width: 100pct, height: 100pct, flex_direction: FlexDirection::Column) {
+                            View (width: 100pct, height: 100pct) {
                                 #(
                                     match postgres_record.record.as_ref() {
-                                        Some(proto::common::postgres_record::Record::Table(table)) => table
-                                            .rows
-                                            .iter()
-                                            .enumerate()
-                                            .map(|(i, row)| {
-                                                element! {
-                                                    View (flex_direction: FlexDirection::Column) {
-                                                        #(if i == 0 {
-                                                            element! {
-                                                                View{
-                                                                    #(row.columns.iter().map(|column| element! {
-                                                                        View(width: 100pct, border_style: BorderStyle::Single, border_edges: Edges::Bottom, border_color: Color::Grey) {
-                                                                            Text(content: column.name.clone())
-                                                                        }
+                                        Some(proto::common::postgres_record::Record::Table(table)) => {
+                                            let table_callback_state = props.state.clone();
+                                            element! {
+                                                TableView(
+                                                    columns: table.rows.first().map(|row| row.columns.iter().map(|column| column.name.clone()).collect::<Vec<String>>()).unwrap_or_default(),
+                                                    rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone()).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
+                                                    has_focus: tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult),
+                                                    selected_row: selected_row.read().clone(),
+                                                    on_key: Some(table_key_handler(move |code, (columns, row)| {
+                                                        match code {
+                                                            KeyCode::Char('d') => {
+                                                                let mut state_guard = tokio::task::block_in_place(|| table_callback_state.blocking_lock());
+                                                                state_guard.query_result_cmd = Some(QueryResultCmd::RemoveRecordFromObject(proto::common::DbRecord {
+                                                                    specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
+                                                                        record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
+                                                                            rows: vec![PostgresRecordTableRow {
+                                                                                columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
+                                                                                values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
+                                                                            }]
+                                                                        }))
                                                                     }))
-                                                                }
+                                                                }));
+                                                            },
+                                                            KeyCode::Char('i') => {
+                                                                //TODO: update record
+                                                                todo!()
                                                             }
-                                                        } else {
-                                                            element! {
-                                                                View {}
-                                                            }
-                                                        })
-                                                        View(background_color: if i % 2 == 0 { Some(Color::DarkGrey) } else { None }) {
-                                                            #(row.values.iter().map(|value| element! {
-                                                                View (width: 100pct) {
-                                                                    Text(content: match &value.field {
-                                                                        Some(proto::common::db_field::Field::Boolean(b)) => b.boolean.map_or(String::default(), |v| v.to_string()),
-                                                                        Some(proto::common::db_field::Field::Str(str)) => str.str.as_ref().map_or(String::default(), |v| v.clone()),
-                                                                        Some(proto::common::db_field::Field::I8(v)) => v.i8.map_or(String::default(), |v| v.to_string()),
-                                                                        Some(proto::common::db_field::Field::I16(v)) => v.i16.map_or(String::default(), |v| v.to_string()),
-                                                                        Some(proto::common::db_field::Field::I32(v)) => v.i32.map_or(String::default(), |v| v.to_string()),
-                                                                        Some(proto::common::db_field::Field::I64(v)) => v.i64.map_or(String::default(), |v| v.to_string()),
-                                                                        Some(proto::common::db_field::Field::Datetime(v)) => v.datetime.map_or(String::default(), |v| v.to_string()),
-                                                                        _ => "<no value>".to_string()
-                                                                    })
-                                                                }
-                                                            }))
+                                                            _ => {}
                                                         }
-                                                    }
-                                                }
-                                            })
-                                            .collect(),
-                                        _ => Vec::new(),
+                                                    }))
+                                                )
+                                            }
+                                        },
+                                        _ => element! {
+                                            TableView(
+                                                columns: Vec::<String>::new(),
+                                                rows: Vec::<Vec<Field>>::new(),
+                                                has_focus: false,
+                                                selected_row: selected_row.read().clone(),
+                                            )
+                                        },
                                     }
                                 )
                             }
                         }
                     }
-                    _ => 
+                    _ =>
                         element! {
                             View {
                                 Text(content: "Nothing to display")

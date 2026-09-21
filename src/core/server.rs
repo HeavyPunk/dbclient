@@ -1,11 +1,15 @@
 use std::{collections::HashMap, fmt};
 
 use crate::config::Connection;
-use crate::core::dbclient::connector::{self, Connector, ConnectorError, GetObjectRequest, ListAllItemsFromObjectResult};
+use crate::core::dbclient::connector::{
+    self, Connector, ConnectorError, GetObjectRequest, ListAllItemsFromObjectResult,
+};
 use crate::core::dbclient::postgresql::connector_impl::PostgresConnector;
 use crate::core::proto::common::{DbObjectDescriptor, DbRecord};
 use crate::core::proto::objects::{GetObjectOfDecriptorRequest, GetObjectOfDecriptorResponse};
-use crate::core::proto::queries::{AddRecordToObjectRequest, AddRecordToObjectResponse, ExecuteRawQueryRequest, ExecuteRawQueryResponse, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResponse, UpdateRecordOfObjectRequest, UpdateRecordOfObjectResponse};
+use crate::core::proto::queries::{
+    AddRecordToObjectRequest, AddRecordToObjectResponse, ExecuteRawQueryRequest, ExecuteRawQueryResponse, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResponse, RemoveRecordFromObjectRequest, RemoveRecordFromObjectResponse, UpdateRecordOfObjectRequest, UpdateRecordOfObjectResponse,
+};
 use crate::core::{
     dbclient::{
         dummy::DummyFetcher,
@@ -111,7 +115,10 @@ impl ObjectsServer {
         Ok(vec![obj])
     }
 
-    async fn get_object(conn: &Connection, desc: DbObjectDescriptor) -> Result<DbObject, ConnectorError> {
+    async fn get_object(
+        conn: &Connection,
+        desc: DbObjectDescriptor,
+    ) -> Result<DbObject, ConnectorError> {
         let mut conn = Self::resolve_connector(conn);
         return Ok(conn.get_object(desc).await?);
     }
@@ -199,17 +206,16 @@ impl super::proto::objects::ObjectsService for ObjectsServer {
                     return Err(ObjectsServerErrors::ConnectionNotFound)?;
                 }
                 match Self::get_object(conn.unwrap(), desc.clone()).await {
-                    Ok(obj) => Ok(GetObjectOfDecriptorResponse {
-                        object: Some(obj)
-                    }),
+                    Ok(obj) => Ok(GetObjectOfDecriptorResponse { object: Some(obj) }),
                     Err(e) => Err(ObjectsServerErrors::ConnectorError(e))?,
                 }
-            },
-            _ => Err(ObjectsServerErrors::ValidationError("connection and descriptor are required"))?
+            }
+            _ => Err(ObjectsServerErrors::ValidationError(
+                "connection and descriptor are required",
+            ))?,
         }
     }
 }
-
 
 pub struct QueriesServer {
     conns: HashMap<String, Connection>,
@@ -257,18 +263,41 @@ impl QueriesServer {
         return conn;
     }
 
-    async fn list_all_items_of_obj(conn: &Connection, obj: DbObjectDescriptor) -> Result<ListAllItemsFromObjectResult, ConnectorError> {
+    async fn list_all_items_of_obj(
+        conn: &Connection,
+        obj: DbObjectDescriptor,
+    ) -> Result<ListAllItemsFromObjectResult, ConnectorError> {
         let mut connector = Self::resolve_connector(conn);
         let items = connector.list_all_items_from_object(obj).await?;
         Ok(items)
     }
 
-    async fn _add_record_to_object(conn: &Connection, desc: DbObjectDescriptor, record: DbRecord) -> Result<(), ConnectorError> {
+    async fn _add_record_to_object(
+        conn: &Connection,
+        desc: DbObjectDescriptor,
+        record: DbRecord,
+    ) -> Result<(), ConnectorError> {
         let mut conn = Self::resolve_connector(conn);
-        return Ok(conn.add_record_to_object(connector::AddRecordToObjectRequest {
-            descriptor: desc,
-            record: record
-        }).await?)
+        return Ok(conn
+            .add_record_to_object(connector::AddRecordToObjectRequest {
+                descriptor: desc,
+                record: record,
+            })
+            .await?);
+    }
+
+    async fn _remove_record_from_object(
+        conn: &Connection,
+        desc: DbObjectDescriptor,
+        record: DbRecord,
+    ) -> Result<(), ConnectorError> {
+        let mut conn = Self::resolve_connector(conn);
+        return Ok(conn
+            .remove_record_from_object(connector::RemoveRecordFromObjectRequest {
+                descriptor: desc,
+                record: record
+            })
+            .await?);
     }
 }
 
@@ -285,22 +314,16 @@ impl super::proto::queries::QueriesService for QueriesServer {
         request: ListAllItemsFromObjectRequest,
     ) -> ::anyhow::Result<ListAllItemsFromObjectResponse> {
         match (request.connection, request.object) {
-            (Some(conn), Some(obj)) => {
-                match self.conns.get(&conn.id) {
-                    Some(conn) => {
-                        match Self::list_all_items_of_obj(conn, obj).await {
-                            Ok(r) => {
-                                Ok(ListAllItemsFromObjectResponse {
-                                    record: Some(r)
-                                })
-                            },
-                            Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
-                        }
-                    },
-                    None => Err(QueriesServerErrors::ConnectionNotFound)?
-                }
+            (Some(conn), Some(obj)) => match self.conns.get(&conn.id) {
+                Some(conn) => match Self::list_all_items_of_obj(conn, obj).await {
+                    Ok(r) => Ok(ListAllItemsFromObjectResponse { record: Some(r) }),
+                    Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
+                },
+                None => Err(QueriesServerErrors::ConnectionNotFound)?,
             },
-            _ => Err(QueriesServerErrors::ValidationError("connection or object is not defined in request"))?
+            _ => Err(QueriesServerErrors::ValidationError(
+                "connection or object is not defined in request",
+            ))?,
         }
     }
     async fn add_record_to_object(
@@ -308,18 +331,16 @@ impl super::proto::queries::QueriesService for QueriesServer {
         request: AddRecordToObjectRequest,
     ) -> ::anyhow::Result<AddRecordToObjectResponse> {
         match (request.connection, request.object, request.record) {
-            (Some(conn), Some(obj), Some(record)) => {
-                match self.conns.get(&conn.id) {
-                    Some(conn) => {
-                        match Self::_add_record_to_object(conn, obj, record).await {
-                            Ok(_) => Ok(AddRecordToObjectResponse {  }),
-                            Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
-                        }
-                    },
-                    None => Err(QueriesServerErrors::ConnectionNotFound)?
-                }
+            (Some(conn), Some(obj), Some(record)) => match self.conns.get(&conn.id) {
+                Some(conn) => match Self::_add_record_to_object(conn, obj, record).await {
+                    Ok(_) => Ok(AddRecordToObjectResponse {}),
+                    Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
+                },
+                None => Err(QueriesServerErrors::ConnectionNotFound)?,
             },
-            _ => Err(QueriesServerErrors::ValidationError("connection or object or record is not defined in the request"))?
+            _ => Err(QueriesServerErrors::ValidationError(
+                "connection or object or record is not defined in the request",
+            ))?,
         }
     }
     async fn update_record_of_object(
@@ -327,6 +348,21 @@ impl super::proto::queries::QueriesService for QueriesServer {
         request: UpdateRecordOfObjectRequest,
     ) -> ::anyhow::Result<UpdateRecordOfObjectResponse> {
         todo!()
+    }
+    async fn remove_record_from_object(
+        &self,
+        request: RemoveRecordFromObjectRequest,
+    ) -> ::anyhow::Result<RemoveRecordFromObjectResponse> {
+        match (request.connection, request.object, request.record) {
+            (Some(conn), Some(obj), Some(record)) => match self.conns.get(&conn.id) {
+                Some(conn) => match Self::_remove_record_from_object(conn, obj, record).await {
+                    Ok(_) => Ok(RemoveRecordFromObjectResponse {  }),
+                    Err(e) => Err(QueriesServerErrors::ConnectorError(e))?
+                },
+                None => Err(QueriesServerErrors::ConnectionNotFound)?
+            },
+            _ => Err(QueriesServerErrors::ValidationError("connection or object or record is not defined in the request"))?
+        }
     }
 }
 

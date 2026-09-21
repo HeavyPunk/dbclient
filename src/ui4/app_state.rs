@@ -44,7 +44,9 @@ pub enum QueryResultCmd {
     ExecuteRawQuery,
     ListAllItemsFromObject,
     AddRecordToObject(proto::common::DbRecord),
-    ClosePopup
+    RemoveRecordFromObject(proto::common::DbRecord),
+    UpdateRecordOfObject(proto::common::DbRecord, proto::common::DbRecord),
+    ClosePopup,
 }
 
 #[derive(Default)]

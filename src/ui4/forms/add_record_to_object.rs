@@ -40,9 +40,8 @@ pub fn AddRecordToObjectForm(
             match code {
                 KeyCode::Esc if focused_field.read().is_none() => {
                     let mut state = tokio::task::block_in_place(|| state.blocking_lock());
-                    state.query_result_cmd = Some(
-                        crate::ui4::app_state::QueryResultCmd::ClosePopup
-                    );
+                    state.query_result_cmd =
+                        Some(crate::ui4::app_state::QueryResultCmd::ClosePopup);
                 }
                 KeyCode::Esc if focused_field.read().is_some() => {
                     focused_field.set(None);
@@ -160,14 +159,26 @@ fn FormTextInput(props: &FormTextInputProps, _hooks: Hooks) -> impl Into<AnyElem
 
 fn field_into_string(input: &proto::common::db_field::Field) -> String {
     match input {
-        proto::common::db_field::Field::Str(s) => s.str.as_ref().map_or(String::default(), |v| v.to_string()),
+        proto::common::db_field::Field::Str(s) => {
+            s.str.as_ref().map_or(String::default(), |v| v.to_string())
+        }
         proto::common::db_field::Field::StrContainer(sc) => sc.strs.join("\n"),
         proto::common::db_field::Field::I8(i) => i.i8.map_or(String::default(), |v| v.to_string()),
-        proto::common::db_field::Field::I16(i) => i.i16.map_or(String::default(), |v| v.to_string()),
-        proto::common::db_field::Field::I32(i) => i.i32.map_or(String::default(), |v| v.to_string()),
-        proto::common::db_field::Field::I64(i) => i.i64.map_or(String::default(), |v| v.to_string()),
-        proto::common::db_field::Field::Boolean(b) => b.boolean.map_or(String::default(), |v| v.to_string()),
-        proto::common::db_field::Field::Datetime(timestamp) => timestamp.datetime.map_or(String::default(), |v| v.to_string()),
+        proto::common::db_field::Field::I16(i) => {
+            i.i16.map_or(String::default(), |v| v.to_string())
+        }
+        proto::common::db_field::Field::I32(i) => {
+            i.i32.map_or(String::default(), |v| v.to_string())
+        }
+        proto::common::db_field::Field::I64(i) => {
+            i.i64.map_or(String::default(), |v| v.to_string())
+        }
+        proto::common::db_field::Field::Boolean(b) => {
+            b.boolean.map_or(String::default(), |v| v.to_string())
+        }
+        proto::common::db_field::Field::Datetime(timestamp) => timestamp
+            .datetime
+            .map_or(String::default(), |v| v.to_string()),
     }
 }
 
@@ -178,7 +189,11 @@ fn field_from_string(
     match initial_field {
         proto::common::db_field::Field::Str(_) => {
             Ok(proto::common::db_field::Field::Str(proto::common::String {
-                str: if input.is_empty() { None } else { Some(input.clone()) }
+                str: if input.is_empty() {
+                    None
+                } else {
+                    Some(input.clone())
+                },
             }))
         }
         proto::common::db_field::Field::StrContainer(_) => {
@@ -190,57 +205,61 @@ fn field_from_string(
         proto::common::db_field::Field::I8(_) => {
             if input.is_empty() {
                 return Ok(proto::common::db_field::Field::I8(proto::common::Int8 {
-                    i8: None
+                    i8: None,
                 }));
             }
             let i = i8::from_str_radix(&input, 10)?;
             Ok(proto::common::db_field::Field::I8(proto::common::Int8 {
-                i8: Some(i as i32)
+                i8: Some(i as i32),
             }))
         }
         proto::common::db_field::Field::I16(_) => {
             if input.is_empty() {
                 return Ok(proto::common::db_field::Field::I16(proto::common::Int16 {
-                    i16: None
+                    i16: None,
                 }));
             }
             let i = i16::from_str_radix(&input, 10)?;
             Ok(proto::common::db_field::Field::I16(proto::common::Int16 {
-                i16: Some(i as i32)
+                i16: Some(i as i32),
             }))
         }
         proto::common::db_field::Field::I32(_) => {
             if input.is_empty() {
                 return Ok(proto::common::db_field::Field::I32(proto::common::Int32 {
-                    i32: None
+                    i32: None,
                 }));
             }
             let i = i32::from_str_radix(&input, 10)?;
             Ok(proto::common::db_field::Field::I32(proto::common::Int32 {
-                i32: Some(i)
+                i32: Some(i),
             }))
         }
         proto::common::db_field::Field::I64(_) => {
             if input.is_empty() {
                 return Ok(proto::common::db_field::Field::I64(proto::common::Int64 {
-                    i64: None
+                    i64: None,
                 }));
             }
             let i = i64::from_str_radix(&input, 10)?;
             Ok(proto::common::db_field::Field::I64(proto::common::Int64 {
-                i64: Some(i)
+                i64: Some(i),
             }))
         }
         proto::common::db_field::Field::Boolean(_) => match input.as_str() {
-            "true" | "1" => Ok(proto::common::db_field::Field::Boolean(proto::common::Boolean {
-                boolean: Some(true)
-            })),
-            "false" | "0" => Ok(proto::common::db_field::Field::Boolean(proto::common::Boolean {
-                boolean: Some(false)
-            })),
-            "" => Ok(proto::common::db_field::Field::Boolean(proto::common::Boolean {
-                boolean: None
-            })),
+            "true" | "1" => Ok(proto::common::db_field::Field::Boolean(
+                proto::common::Boolean {
+                    boolean: Some(true),
+                },
+            )),
+            "false" | "0" => Ok(proto::common::db_field::Field::Boolean(
+                proto::common::Boolean {
+                    boolean: Some(false),
+                },
+            )),
+            "" => Ok(proto::common::db_field::Field::Boolean(
+                proto::common::Boolean { boolean: None },
+            )),
             _ => Err(anyhow!("cannot be mapped into boolean")),
         },
         proto::common::db_field::Field::Datetime(_) => {
