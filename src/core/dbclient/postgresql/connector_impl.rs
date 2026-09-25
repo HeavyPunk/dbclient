@@ -6,8 +6,10 @@ use tokio_postgres::NoTls;
 
 use crate::core::{
     dbclient::connector::{
-        AddRecordToObjectRequest, Connector, GetObjectsResult, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResult, RemoveRecordFromObjectRequest,
-    }, proto::{
+        AddRecordToObjectRequest, Connector, GetObjectsResult, ListAllItemsFromObjectRequest,
+        ListAllItemsFromObjectResult, RemoveRecordFromObjectRequest, UpdateRecordOfObjectRequest,
+    },
+    proto::{
         self,
         common::{DbField, PostgresObjectDescriptor, PostgresRecord, PostgresTableDescriptor},
     },
@@ -639,7 +641,10 @@ impl Connector for PostgresConnector {
         }
     }
 
-    async fn remove_record_from_object(&mut self, req: RemoveRecordFromObjectRequest) -> Result<(), crate::core::dbclient::connector::ConnectorError> {
+    async fn remove_record_from_object(
+        &mut self,
+        req: RemoveRecordFromObjectRequest,
+    ) -> Result<(), crate::core::dbclient::connector::ConnectorError> {
         match (req.record.specification, req.descriptor.descriptor) {
             (
                 Some(proto::common::db_record::Specification::Postgres(PostgresRecord {
@@ -651,7 +656,7 @@ impl Connector for PostgresConnector {
                             Some(proto::common::postgres_object_descriptor::Descriptor::Table(
                                 PostgresTableDescriptor {
                                     name: table_name, ..
-                                }
+                                },
                             )),
                     },
                 )),
@@ -690,22 +695,119 @@ impl Connector for PostgresConnector {
                     let filters = filters.join(" AND ");
                     transaction
                         .execute(
-                            &format!(
-                                "DELETE FROM {} WHERE {}",
-                                &table_name, &filters
-                            ),
+                            &format!("DELETE FROM {} WHERE {}", &table_name, &filters),
                             &[],
                         )
                         .await?;
                 }
                 transaction.commit().await?;
                 Ok(())
-            },
+            }
             _ => Err(
                 crate::core::dbclient::connector::ConnectorError::InvalidRequest(
-                    "passed record and descriptor couldn't be matched"
-                )
-            )
+                    "passed record and descriptor couldn't be matched",
+                ),
+            ),
+        }
+    }
+
+    async fn update_record_from_object(
+        &mut self,
+        req: UpdateRecordOfObjectRequest,
+    ) -> Result<(), crate::core::dbclient::connector::ConnectorError> {
+        match (
+            req.old_object.specification,
+            req.new_object.specification,
+            req.descriptor.descriptor,
+        ) {
+            (
+                Some(proto::common::db_record::Specification::Postgres(PostgresRecord {
+                    record: Some(proto::common::postgres_record::Record::Table(old_table)),
+                })),
+                Some(proto::common::db_record::Specification::Postgres(PostgresRecord {
+                    record: Some(proto::common::postgres_record::Record::Table(new_table)),
+                })),
+                Some(proto::common::db_object_descriptor::Descriptor::Postgres(
+                    PostgresObjectDescriptor {
+                        descriptor:
+                            Some(proto::common::postgres_object_descriptor::Descriptor::Table(
+                                PostgresTableDescriptor {
+                                    name: table_name, ..
+                                },
+                            )),
+                    },
+                )),
+            ) => {
+                //NOTE: on invalid table, whole operation should be rejected
+                for row in &old_table.rows {
+                    if row.columns.len() != row.values.len() {
+                        return Err(
+                            crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                                "columns and values should have equal size",
+                            ),
+                        );
+                    }
+                }
+                for row in &new_table.rows {
+                    if row.columns.len() != row.values.len() {
+                        return Err(
+                            crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                                "columns and values should have equal size",
+                            ),
+                        );
+                    }
+                }
+
+                let (mut client, connection) =
+                    tokio_postgres::connect(&self.config.uri, NoTls).await?;
+                tokio::spawn(async move {
+                    if let Err(error) = connection.await {
+                        eprintln!("PostgreSQL connection error: {error}");
+                    }
+                });
+
+                let transaction = client.transaction().await?;
+
+                for (old_row, new_row) in old_table.rows.iter().zip(new_table.rows) {
+                    let mut filter = vec![];
+                    for (col, field) in old_row.columns.iter().zip(old_row.values.iter()) {
+                        let Some(rendered_field) = field.into_sql_value() else {
+                            continue;
+                        };
+                        filter.push(format!("{}={}", col.name.clone(), rendered_field));
+                    }
+                    if filter.is_empty() {
+                        continue;
+                    }
+                    let filter = filter.join(" AND ");
+
+                    let mut replaces = vec![];
+                    for (col, field) in new_row.columns.iter().zip(new_row.values.iter()) {
+                        let Some(rendered_field) = field.into_sql_value() else {
+                            continue;
+                        };
+                        replaces.push(format!("{}={}", col.name.clone(), rendered_field));
+                    }
+                    if replaces.is_empty() {
+                        continue;
+                    }
+                    let replaces = replaces.join(",");
+
+                    transaction
+                        .execute(
+                            &format!("UPDATE {table_name} SET {replaces} WHERE {filter}"),
+                            &[],
+                        )
+                        .await?;
+                }
+                transaction.commit().await?;
+                Ok(())
+            }
+            _ => Err(
+                crate::core::dbclient::connector::ConnectorError::InvalidRequest(
+                    "passed record and descriptor couldn't be matched",
+                ),
+            ),
         }
     }
 }

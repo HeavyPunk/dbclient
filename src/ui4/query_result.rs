@@ -11,11 +11,24 @@ use tokio::sync::Mutex;
 
 use crate::{
     core::proto::{
-        self, common::{DbRecord, PostgresRecordTableRow, db_field::Field},
-    }, ui4::{
-        app_state::{AppState, QueryResultCmd}, components::table_view::{TableView, table_key_handler}, forms::add_record_to_object::AddRecordToObjectForm,
+        self,
+        common::{db_field::Field, DbRecord, PostgresRecordTableRow},
+    },
+    ui4::{
+        app_state::{AppState, QueryResultCmd},
+        components::table_view::{table_key_handler, TableView},
+        forms::{
+            add_record_to_object::AddRecordToObjectForm,
+            update_record_of_object::UpdateRecordOfObject,
+        },
     },
 };
+
+#[derive(PartialEq, Clone)]
+enum Popup {
+    AddRecordToObject(bool),
+    UpdateRecordOfObject(proto::common::DbRecord),
+}
 
 #[derive(Default, Props)]
 pub struct QueryResultProps {
@@ -32,8 +45,7 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
     let mut selected_object = hooks.use_state(|| None);
     let selected_row = hooks.use_state(|| Arc::new(Mutex::new(None::<usize>)));
 
-    let mut render_add_record_to_object_widget = hooks.use_state(|| false);
-    let mut add_record_to_object_widget_data_loaded = hooks.use_state(|| false);
+    let mut render_popup: iocraft::prelude::State<Option<Popup>> = hooks.use_state(|| None);
 
     let state = props.state.clone();
     hooks.use_future(async move {
@@ -91,39 +103,56 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                     continue;
                 }
                 Some(QueryResultCmd::RemoveRecordFromObject(record)) => {
-                    match (&queries_client, &state.selected_connection, &state.selected_object) {
+                    match (
+                        &queries_client,
+                        &state.selected_connection,
+                        &state.selected_object,
+                    ) {
                         (Some(client), Some(selected_connection), Some(selected_object)) => {
                             let _r = client
-                                .remove_record_from_object(proto::queries::RemoveRecordFromObjectRequest {
-                                    connection: Some(selected_connection.clone()),
-                                    object: Some(selected_object.clone()),
-                                    record: Some(record.clone())
-                                })
-                            .await;
+                                .remove_record_from_object(
+                                    proto::queries::RemoveRecordFromObjectRequest {
+                                        connection: Some(selected_connection.clone()),
+                                        object: Some(selected_object.clone()),
+                                        record: Some(record.clone()),
+                                    },
+                                )
+                                .await;
                             // TODO: log if error + restore records from object after operation done
-                        },
+                        }
                         _ => {}
                     }
                 }
                 Some(QueryResultCmd::UpdateRecordOfObject(old_record, new_record)) => {
-                    match (&queries_client, &state.selected_connection, &state.selected_object) {
+                    match (
+                        &queries_client,
+                        &state.selected_connection,
+                        &state.selected_object,
+                    ) {
                         (Some(client), Some(selected_connection), Some(selected_object)) => {
                             let _r = client
-                                .update_record_of_object(proto::queries::UpdateRecordOfObjectRequest {
-                                    connection: Some(selected_connection.clone()),
-                                    object: Some(selected_object.clone()),
-                                    old_record: Some(old_record.clone()),
-                                    new_record: Some(new_record.clone()),
-                                })
-                            .await;
+                                .update_record_of_object(
+                                    proto::queries::UpdateRecordOfObjectRequest {
+                                        connection: Some(selected_connection.clone()),
+                                        object: Some(selected_object.clone()),
+                                        old_record: Some(old_record.clone()),
+                                        new_record: Some(new_record.clone()),
+                                    },
+                                )
+                                .await;
                             // TODO: log if error + restore records from object after operation done
-                        },
+                        }
                         _ => {}
                     }
+                    state.query_result_cmd = Some(QueryResultCmd::ClosePopup);
+                    continue;
+                }
+                Some(QueryResultCmd::OpenAddRecordPopup) => {
+                    render_popup.set(Some(Popup::AddRecordToObject(false)));
                 }
                 Some(QueryResultCmd::ClosePopup) => {
                     selected_object.set(None);
-                    render_add_record_to_object_widget.set(false);
+                    render_popup.set(None);
                     state.focus_widget = crate::ui4::app_state::Widget::QueryResult;
                 }
                 _ => {}
@@ -136,27 +165,34 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
     hooks.use_future(async move {
         loop {
             tokio::time::sleep(Duration::from_millis(50)).await;
-            if render_add_record_to_object_widget.get()
-                && !add_record_to_object_widget_data_loaded.get()
-            {
-                let state = state_for_add_add_record_to_object_widget.lock().await;
-                match &db_object_client {
-                    Some(cli) => {
-                        let obj = cli
-                            .get_object_of_decriptor(proto::objects::GetObjectOfDecriptorRequest {
-                                connection: state.selected_connection.clone(),
-                                descriptor: state.selected_object.clone(),
-                            })
-                            .await;
-                        if let Ok(r) = obj {
-                            selected_object.set(r.object);
-                        } else {
-                            panic!("Error: {:?}", obj) // TODO: add log here if error
+            let popup = {
+                let r = render_popup.read();
+                r.clone()
+            };
+            match popup {
+                Some(Popup::AddRecordToObject(is_data_loaded)) if !is_data_loaded => {
+                    let state = state_for_add_add_record_to_object_widget.lock().await;
+                    match &db_object_client {
+                        Some(cli) => {
+                            let obj = cli
+                                .get_object_of_decriptor(
+                                    proto::objects::GetObjectOfDecriptorRequest {
+                                        connection: state.selected_connection.clone(),
+                                        descriptor: state.selected_object.clone(),
+                                    },
+                                )
+                                .await;
+                            if let Ok(r) = obj {
+                                selected_object.set(r.object);
+                            } else {
+                                panic!("Error: {:?}", obj) // TODO: add log here if error
+                            }
                         }
-                    }
-                    None => {}
-                };
-                add_record_to_object_widget_data_loaded.set(true);
+                        None => {}
+                    };
+                    render_popup.set(Some(Popup::AddRecordToObject(true)));
+                }
+                _ => {}
             }
         }
     });
@@ -175,11 +211,6 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
         }
 
         match code {
-            KeyCode::Char('a') => {
-                render_add_record_to_object_widget.set(true);
-                add_record_to_object_widget_data_loaded.set(false);
-                state.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
-            }
             KeyCode::Char('h') => {
                 state.focus_widget = crate::ui4::app_state::Widget::DbObjects;
             }
@@ -196,8 +227,8 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
             border_color: Color::Cyan,
         ) {
             #(
-                match (render_add_record_to_object_widget.get(), selected_object.read().as_ref()) {
-                    (true, Some(obj)) => {
+                match (render_popup.read().as_ref(), selected_object.read().as_ref()) {
+                    (Some(Popup::AddRecordToObject(true)), Some(obj)) => {
                         let form_state = props.state.clone();
                         element! {
                             View(
@@ -214,6 +245,24 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                             }
                         }
                     },
+                    (Some(Popup::UpdateRecordOfObject(initial_record)), _) => {
+                        // dbg!(initial_record);
+                        let form_state = props.state.clone();
+                        element! {
+                            View(
+                                position: Position::Absolute,
+                                width: 70pct,
+                                height: 50pct,
+                                top: 8,
+                                left: 4,
+                            ) {
+                                UpdateRecordOfObject(
+                                    state: form_state,
+                                    initial_record: initial_record.clone(),
+                                )
+                            }
+                        }
+                    }
                     _ => {
                         element! {
                             View {}
@@ -238,6 +287,12 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                                                     selected_row: selected_row.read().clone(),
                                                     on_key: Some(table_key_handler(move |code, (columns, row)| {
                                                         match code {
+                                                            KeyCode::Char('a') => {
+                                                                let mut state_guard = tokio::task::block_in_place(|| table_callback_state.blocking_lock());
+                                                                render_popup.set(Some(Popup::AddRecordToObject(false)));
+                                                                state_guard.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
+
+                                                            }
                                                             KeyCode::Char('d') => {
                                                                 let mut state_guard = tokio::task::block_in_place(|| table_callback_state.blocking_lock());
                                                                 state_guard.query_result_cmd = Some(QueryResultCmd::RemoveRecordFromObject(proto::common::DbRecord {
@@ -252,8 +307,19 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                                                                 }));
                                                             },
                                                             KeyCode::Char('i') => {
-                                                                //TODO: update record
-                                                                todo!()
+                                                                let mut state_guard = tokio::task::block_in_place(|| table_callback_state.blocking_lock());
+                                                                let initial_record = proto::common::DbRecord {
+                                                                    specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
+                                                                        record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
+                                                                            rows: vec![PostgresRecordTableRow {
+                                                                                columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
+                                                                                values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
+                                                                            }]
+                                                                        }))
+                                                                    }))
+                                                                };
+                                                                render_popup.set(Some(Popup::UpdateRecordOfObject(initial_record)));
+                                                                state_guard.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
                                                             }
                                                             _ => {}
                                                         }

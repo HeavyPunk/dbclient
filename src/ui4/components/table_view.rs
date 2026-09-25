@@ -14,7 +14,8 @@ use crate::core::proto::common::db_field::Field;
 
 pub type TableKeyHandler = Arc<Mutex<Box<dyn FnMut(KeyCode, (Vec<String>, Vec<Field>)) + Send>>>;
 pub fn table_key_handler<F>(callback: F) -> TableKeyHandler
-    where F: FnMut(KeyCode, (Vec<String>, Vec<Field>)) + Send + 'static
+where
+    F: FnMut(KeyCode, (Vec<String>, Vec<Field>)) + Send + 'static,
 {
     Arc::new(Mutex::new(Box::new(callback)))
 }

@@ -46,6 +46,7 @@ pub enum QueryResultCmd {
     AddRecordToObject(proto::common::DbRecord),
     RemoveRecordFromObject(proto::common::DbRecord),
     UpdateRecordOfObject(proto::common::DbRecord, proto::common::DbRecord),
+    OpenAddRecordPopup,
     ClosePopup,
 }
 
@@ -68,9 +69,6 @@ pub struct AppContainerProps {
 
 #[component]
 pub fn AppContainer(props: &AppContainerProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let (width, mut height) = hooks.use_terminal_size();
-    height = height - 1;
-
     let state = props.state.clone();
     let mut page = hooks.use_state(|| Page::default());
 
@@ -106,8 +104,8 @@ pub fn AppContainer(props: &AppContainerProps, mut hooks: Hooks) -> impl Into<An
                 },
                 Page::QueryArea => element! {
                     View (
-                        width,
-                        height,
+                        width: width,
+                        height: height,
                     ) {
                         QueryArea(
                             queries_client: props.queries_client.clone(),

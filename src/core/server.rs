@@ -8,7 +8,10 @@ use crate::core::dbclient::postgresql::connector_impl::PostgresConnector;
 use crate::core::proto::common::{DbObjectDescriptor, DbRecord};
 use crate::core::proto::objects::{GetObjectOfDecriptorRequest, GetObjectOfDecriptorResponse};
 use crate::core::proto::queries::{
-    AddRecordToObjectRequest, AddRecordToObjectResponse, ExecuteRawQueryRequest, ExecuteRawQueryResponse, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResponse, RemoveRecordFromObjectRequest, RemoveRecordFromObjectResponse, UpdateRecordOfObjectRequest, UpdateRecordOfObjectResponse,
+    AddRecordToObjectRequest, AddRecordToObjectResponse, ExecuteRawQueryRequest,
+    ExecuteRawQueryResponse, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResponse,
+    RemoveRecordFromObjectRequest, RemoveRecordFromObjectResponse, UpdateRecordOfObjectRequest,
+    UpdateRecordOfObjectResponse,
 };
 use crate::core::{
     dbclient::{
@@ -295,7 +298,23 @@ impl QueriesServer {
         return Ok(conn
             .remove_record_from_object(connector::RemoveRecordFromObjectRequest {
                 descriptor: desc,
-                record: record
+                record: record,
+            })
+            .await?);
+    }
+
+    async fn _update_record_of_object(
+        conn: &Connection,
+        desc: DbObjectDescriptor,
+        old_record: DbRecord,
+        new_record: DbRecord,
+    ) -> Result<(), ConnectorError> {
+        let mut conn = Self::resolve_connector(conn);
+        return Ok(conn
+            .update_record_from_object(connector::UpdateRecordOfObjectRequest {
+                descriptor: desc,
+                old_object: old_record,
+                new_object: new_record,
             })
             .await?);
     }
@@ -347,7 +366,27 @@ impl super::proto::queries::QueriesService for QueriesServer {
         &self,
         request: UpdateRecordOfObjectRequest,
     ) -> ::anyhow::Result<UpdateRecordOfObjectResponse> {
-        todo!()
+        let Some(conn) = request.connection else {
+            return Err(QueriesServerErrors::ValidationError("connection is empty"))?;
+        };
+        let Some(desc) = request.object else {
+            return Err(QueriesServerErrors::ValidationError(
+                "object descriptor is empty",
+            ))?;
+        };
+        let Some(old_record) = request.old_record else {
+            return Err(QueriesServerErrors::ValidationError("old record is empty"))?;
+        };
+        let Some(new_record) = request.new_record else {
+            return Err(QueriesServerErrors::ValidationError("new record is empty"))?;
+        };
+        let Some(conn) = self.conns.get(&conn.id) else {
+            return Err(QueriesServerErrors::ConnectionNotFound)?;
+        };
+        match Self::_update_record_of_object(conn, desc, old_record, new_record).await {
+            Ok(_) => Ok(UpdateRecordOfObjectResponse {}),
+            Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
+        }
     }
     async fn remove_record_from_object(
         &self,
@@ -356,12 +395,14 @@ impl super::proto::queries::QueriesService for QueriesServer {
         match (request.connection, request.object, request.record) {
             (Some(conn), Some(obj), Some(record)) => match self.conns.get(&conn.id) {
                 Some(conn) => match Self::_remove_record_from_object(conn, obj, record).await {
-                    Ok(_) => Ok(RemoveRecordFromObjectResponse {  }),
-                    Err(e) => Err(QueriesServerErrors::ConnectorError(e))?
+                    Ok(_) => Ok(RemoveRecordFromObjectResponse {}),
+                    Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
                 },
-                None => Err(QueriesServerErrors::ConnectionNotFound)?
+                None => Err(QueriesServerErrors::ConnectionNotFound)?,
             },
-            _ => Err(QueriesServerErrors::ValidationError("connection or object or record is not defined in the request"))?
+            _ => Err(QueriesServerErrors::ValidationError(
+                "connection or object or record is not defined in the request",
+            ))?,
         }
     }
 }

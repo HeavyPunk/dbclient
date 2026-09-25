@@ -22,6 +22,12 @@ pub struct RemoveRecordFromObjectRequest {
     pub record: proto::common::DbRecord,
 }
 
+pub struct UpdateRecordOfObjectRequest {
+    pub descriptor: proto::common::DbObjectDescriptor,
+    pub old_object: proto::common::DbRecord,
+    pub new_object: proto::common::DbRecord,
+}
+
 #[async_trait::async_trait]
 pub trait Connector: Send {
     async fn get_objects(&mut self) -> Result<GetObjectsResult, ConnectorError>;
@@ -41,6 +47,11 @@ pub trait Connector: Send {
 
     async fn remove_record_from_object(
         &mut self,
-        req: RemoveRecordFromObjectRequest
+        req: RemoveRecordFromObjectRequest,
+    ) -> Result<(), ConnectorError>;
+
+    async fn update_record_from_object(
+        &mut self,
+        req: UpdateRecordOfObjectRequest,
     ) -> Result<(), ConnectorError>;
 }

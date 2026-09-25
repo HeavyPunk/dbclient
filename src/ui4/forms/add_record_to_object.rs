@@ -143,7 +143,7 @@ fn FormTextInput(props: &FormTextInputProps, _hooks: Hooks) -> impl Into<AnyElem
                             .as_mut()
                             .and_then(|specification| field_at_mut(specification, index))
                         {
-                            if let Some(initial_field) = field.field.clone() {
+                            if let Some(initial_field) = &field.field {
                                 if let Ok(mapped_field) = field_from_string(&new_value, initial_field) {
                                     field.field = Some(mapped_field);
                                     fields.set(next_specification);
@@ -157,7 +157,7 @@ fn FormTextInput(props: &FormTextInputProps, _hooks: Hooks) -> impl Into<AnyElem
     }
 }
 
-fn field_into_string(input: &proto::common::db_field::Field) -> String {
+pub fn field_into_string(input: &proto::common::db_field::Field) -> String {
     match input {
         proto::common::db_field::Field::Str(s) => {
             s.str.as_ref().map_or(String::default(), |v| v.to_string())
@@ -182,9 +182,9 @@ fn field_into_string(input: &proto::common::db_field::Field) -> String {
     }
 }
 
-fn field_from_string(
+pub fn field_from_string(
     input: &String,
-    initial_field: proto::common::db_field::Field,
+    initial_field: &proto::common::db_field::Field,
 ) -> anyhow::Result<proto::common::db_field::Field> {
     match initial_field {
         proto::common::db_field::Field::Str(_) => {
