@@ -76,8 +76,8 @@ pub fn UpdateRecordOfObject(
         View(
             width: 100pct,
             flex_direction: iocraft::FlexDirection::Column,
-            background_color: Some(Color::DarkBlue),
             border_style: iocraft::components::BorderStyle::Round,
+            border_color: Color::Yellow
         ) {
             #(fields.read().iter().enumerate().map(|(index, field)| element! {
                 View(

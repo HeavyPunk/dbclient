@@ -224,7 +224,7 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
             height: 100pct,
             justify_content: Some(AlignContent::Center),
             border_style: BorderStyle::Round,
-            border_color: Color::Cyan,
+            border_color: if tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult) { Color::Yellow } else { Color::Cyan },
         ) {
             #(
                 match (render_popup.read().as_ref(), selected_object.read().as_ref()) {

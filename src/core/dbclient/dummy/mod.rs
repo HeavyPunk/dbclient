@@ -1,5 +1,3 @@
-use super::fetcher::{FetchResult, Fetcher};
-
 pub struct DummyFetcher {
     objects: Vec<String>,
 }
@@ -14,18 +12,5 @@ impl DummyFetcher {
                 String::from("dummy_obj_4"),
             ],
         }
-    }
-}
-
-impl Fetcher for DummyFetcher {
-    fn fetch(
-        &mut self,
-        _: &super::fetcher::FetchRequest,
-    ) -> Result<super::fetcher::FetchResult, super::fetcher::FetcherError> {
-        Ok(FetchResult::multiple(&self.objects))
-    }
-
-    fn fetch_db_objects(&mut self) -> Result<FetchResult, super::fetcher::FetcherError> {
-        Ok(FetchResult::multiple(&self.objects))
     }
 }

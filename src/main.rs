@@ -7,15 +7,10 @@ use config::Config;
 use iocraft::{element, ElementExt};
 use tokio::sync::Mutex;
 
-use crate::{
-    core::proto,
-    ui4::app_state::{AppState, Page},
-};
+use crate::ui4::app_state::{AppState, Page};
 mod cli;
 mod config;
 mod core;
-mod dbclient;
-mod ui3;
 mod ui4;
 
 #[tokio::main]

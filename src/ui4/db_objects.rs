@@ -248,7 +248,7 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
     });
 
     element! {
-        View(width: 100pct, height: 100pct, border_style: BorderStyle::Round, border_color: Color::Cyan) {
+        View(width: 100pct, height: 100pct, border_style: BorderStyle::Round, border_color: if focus.get() { Color::Yellow } else { Color::Cyan }) {
             FileTree::<common::PostgresObjectDescriptor>(
                 nodes: nodes,
                 selected_path: selected_path.read().clone(),

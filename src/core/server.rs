@@ -16,7 +16,6 @@ use crate::core::proto::queries::{
 use crate::core::{
     dbclient::{
         dummy::DummyFetcher,
-        fetcher::{FetchRequest, FetchResult, Fetcher, FetcherError},
         postgresql::{PostgresConfig, PostgresFetcher},
         query_builder::QueryElement,
         redis::{RedisConfig, RedisFetcher},
@@ -66,7 +65,6 @@ pub struct ObjectsServer {
 enum ObjectsServerErrors {
     ValidationError(&'static str),
     ConnectionNotFound,
-    FetcherError(FetcherError),
     ConnectorError(ConnectorError),
 }
 
@@ -75,15 +73,8 @@ impl fmt::Display for ObjectsServerErrors {
         match self {
             ObjectsServerErrors::ValidationError(e) => write!(f, "validation error: {}", e),
             ObjectsServerErrors::ConnectionNotFound => write!(f, "connection not found"),
-            ObjectsServerErrors::FetcherError(_) => write!(f, "fetcher error"),
             ObjectsServerErrors::ConnectorError(_) => write!(f, "connector error"),
         }
-    }
-}
-
-impl From<FetcherError> for ObjectsServerErrors {
-    fn from(value: FetcherError) -> Self {
-        return Self::FetcherError(value);
     }
 }
 

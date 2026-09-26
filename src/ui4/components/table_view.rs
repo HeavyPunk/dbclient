@@ -144,7 +144,7 @@ pub fn TableView(props: &TableViewProps, mut hooks: Hooks) -> impl Into<AnyEleme
                         ) {
                             #(row.iter().map(|field| element! {
                                 View(width: 100pct) {
-                                    Text(content: field_to_string(field), color: if index == cursor.get() { Some(Color::Black) } else { None })
+                                    Text(content: field_to_string(field), color: if index == cursor.get() || index % 2 == 0 { Some(Color::Black) } else { None })
                                 }
                             }))
                         }
