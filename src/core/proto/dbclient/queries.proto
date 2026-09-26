@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package dbclient.queries;
+
+import "common.proto";
+import "connections.proto";
+import "google/protobuf/timestamp.proto";
+
+service QueriesService {
+  rpc ExecuteRawQuery(ExecuteRawQueryRequest) returns (ExecuteRawQueryResponse);
+  rpc ListAllItemsFromObject(ListAllItemsFromObjectRequest) returns (ListAllItemsFromObjectResponse);
+  rpc AddRecordToObject(AddRecordToObjectRequest) returns (AddRecordToObjectResponse);
+  rpc UpdateRecordOfObject(UpdateRecordOfObjectRequest) returns (UpdateRecordOfObjectResponse);
+  rpc RemoveRecordFromObject(RemoveRecordFromObjectRequest) returns (RemoveRecordFromObjectResponse);
+}
+
+message ExecuteRawQueryRequest {
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
+  string query = 3;
+}
+
+message ExecuteRawQueryResponse {
+  QueryResult result = 1;
+}
+
+message ListAllItemsFromObjectRequest {
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
+}
+
+message ListAllItemsFromObjectResponse {
+  common.DbRecord record = 1;
+}
+
+message AddRecordToObjectRequest {
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
+  common.DbRecord record = 3;
+}
+
+message AddRecordToObjectResponse {
+}
+
+message UpdateRecordOfObjectRequest {
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
+  common.DbRecord old_record = 3;
+  common.DbRecord new_record = 4;
+}
+
+message UpdateRecordOfObjectResponse {
+}
+
+message RemoveRecordFromObjectRequest {
+  connections.Connection connection = 1;
+  common.DbObjectDescriptor object = 2;
+  common.DbRecord record = 3;
+}
+
+message RemoveRecordFromObjectResponse {
+}
+
+message QueryResult {
+  oneof result {
+    string status = 1;
+    common.DbRecord record = 2;
+  }
+}
+

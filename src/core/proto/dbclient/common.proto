@@ -1,0 +1,179 @@
+syntax = "proto3";
+
+package dbclient.common;
+
+import "google/protobuf/timestamp.proto";
+
+
+message DbRecord {
+  oneof specification {
+    PostgresRecord postgres = 1;
+  }
+}
+
+message PostgresRecord {
+  oneof record {
+    PostgresRecordTable table = 1;
+  }
+}
+
+message PostgresRecordTable {
+  // PostgresTableColumn is column descriptor
+  repeated PostgresRecordTableRow rows = 1;
+}
+
+message PostgresRecordTableRow {
+  repeated PostgresTableColumn columns = 1;
+  repeated DbField values = 2;
+}
+
+// -----------------------------------------
+
+message DbField {
+  oneof field {
+    String str = 1;
+    StringContainer str_container = 2;
+    Int8 i8 = 3;
+    Int16 i16 = 4;
+    Int32 i32 = 5;
+    Int64 i64 = 6;
+    Boolean boolean = 7;
+    Timestamp datetime = 8;
+  }
+}
+
+message String {
+  optional string str = 1;
+}
+
+message StringContainer {
+  repeated string strs = 1;
+}
+
+message Int8 {
+  optional int32 i8 = 1;
+}
+
+message Int16 {
+  optional int32 i16 = 1;
+}
+
+message Int32 {
+  optional int32 i32 = 1;
+}
+
+message Int64 {
+  optional int64 i64 = 1;
+}
+
+message Boolean {
+  optional bool boolean = 1;
+}
+
+message Timestamp {
+  optional google.protobuf.Timestamp datetime = 1;
+}
+
+message DbObject {
+  oneof specification {
+    PostgresObject postgres = 1;
+    RedisObject redis = 2;
+  };
+}
+
+message DbObjectDescriptor {
+  oneof descriptor {
+    PostgresObjectDescriptor postgres = 1;
+  }
+}
+
+// ------------------------------------------
+
+message PostgresObject {
+  oneof object {
+    PostgresDatabase database = 1;
+    PostgresSchema schema = 2;
+    PostgresTable table = 3;
+  }
+}
+
+message PostgresObjectDescriptor {
+  oneof descriptor {
+    PostgresDatabaseDescriptor database = 1;
+    PostgresSchemaDescriptor schema = 2;
+    PostgresTableDescriptor table = 3;
+  }
+}
+
+message RedisObject {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    STRING = 1;
+  }
+  string name = 1;
+  Type obj_type = 2;
+}
+
+message PostgresDatabase {
+  PostgresDatabaseDescriptor descriptor = 1;
+  repeated PostgresSchema schemas = 2;
+}
+
+message PostgresDatabaseDescriptor {
+  string name = 1;
+}
+
+message PostgresSchema {
+  PostgresSchemaDescriptor descriptor = 1;
+  repeated PostgresTable tables = 2;
+  repeated PostgresView views = 3;
+  repeated PostgresView materialized_views = 4;
+  repeated PostgresFunction functions = 5;
+}
+
+message PostgresSchemaDescriptor {
+  PostgresDatabaseDescriptor upstream_descriptor = 1;
+  string name = 2;
+}
+
+message PostgresTable {
+  PostgresTableDescriptor descriptor = 1;
+  repeated PostgresTableColumn columns = 2;
+  repeated PostgresTableConstrain constrains = 3;
+  repeated PostgresTableIndex indexes = 4;
+}
+
+message PostgresTableDescriptor {
+  PostgresSchemaDescriptor upstream_descriptor = 1;
+  string name = 2;
+}
+
+message PostgresTableColumn {
+  string name = 1;
+  // field type descriptor, contains useless value
+  DbField field = 2;
+}
+
+message PostgresTableConstrain {
+  string name = 1;
+}
+
+message PostgresTableIndex {
+  string name = 1;
+}
+
+message PostgresView {
+  string name = 1;
+}
+
+message PostgresFunction {
+  string name = 1;
+}
+
+message PostgresAggregate {
+  string name = 1;
+}
+
+message PostgresType {
+  string name = 1;
+}
