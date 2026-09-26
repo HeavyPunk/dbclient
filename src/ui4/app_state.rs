@@ -54,7 +54,6 @@ pub enum QueryResultCmd {
 pub struct AppState {
     pub selected_connection: Option<proto::connections::Connection>,
     pub selected_object: Option<proto::common::DbObjectDescriptor>,
-    pub query_result_cmd: Option<QueryResultCmd>,
     pub selected_page: Page,
     pub focus_widget: Widget,
 }
@@ -65,10 +64,15 @@ pub struct AppContainerProps {
     pub objects_client: Option<Arc<dyn proto::objects::ObjectsService + Send + Sync>>,
     pub queries_client: Option<Arc<dyn proto::queries::QueriesService + Send + Sync>>,
     pub state: Arc<Mutex<AppState>>,
+    pub query_result_cmd_pipe: Option<tokio::sync::mpsc::Sender<QueryResultCmd>>,
+    pub query_result_cmd_receiver: Option<tokio::sync::mpsc::Receiver<QueryResultCmd>>,
 }
 
 #[component]
-pub fn AppContainer(props: &AppContainerProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+pub fn AppContainer(
+    props: &mut AppContainerProps,
+    mut hooks: Hooks,
+) -> impl Into<AnyElement<'static>> {
     let state = props.state.clone();
     let mut page = hooks.use_state(|| Page::default());
 
@@ -110,7 +114,9 @@ pub fn AppContainer(props: &AppContainerProps, mut hooks: Hooks) -> impl Into<An
                         QueryArea(
                             queries_client: props.queries_client.clone(),
                             objects_client: props.objects_client.clone(),
-                            state: props.state.clone()
+                            state: props.state.clone(),
+                            query_result_cmd_pipe: props.query_result_cmd_pipe.clone(),
+                            query_result_cmd_receiver: props.query_result_cmd_receiver.take(),
                         )
                     }
                 },

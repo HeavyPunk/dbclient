@@ -15,7 +15,7 @@ use crate::{
         common::{self, db_object::Specification, postgres_object::Object},
     },
     ui4::{
-        app_state::{AppState, Widget},
+        app_state::{AppState, QueryResultCmd, Widget},
         file_tree::{FileTree, FileTreeNode},
     },
 };
@@ -25,6 +25,7 @@ type DbFileTreeNode = FileTreeNode<common::PostgresObjectDescriptor>;
 #[derive(Default, Props)]
 pub struct DbObjectsProps {
     pub objects_client: Option<Arc<dyn proto::objects::ObjectsService + Send + Sync>>,
+    pub cmd_pipe: Option<tokio::sync::mpsc::Sender<QueryResultCmd>>,
     pub state: Arc<Mutex<AppState>>,
 }
 
@@ -36,7 +37,11 @@ fn collection_node(name: &str, children: Vec<DbFileTreeNode>) -> Option<DbFileTr
     (!children.is_empty()).then(|| DbFileTreeNode::new(format!("▸ {name}"), children))
 }
 
-fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>) -> DbFileTreeNode {
+fn specification_node(
+    specification: Specification,
+    state: Arc<Mutex<AppState>>,
+    cmd_pipe: tokio::sync::mpsc::Sender<QueryResultCmd>,
+) -> DbFileTreeNode {
     match specification {
         Specification::Redis(redis) => {
             DbFileTreeNode::new(format!("Redis: {}", redis.name), vec![])
@@ -54,6 +59,7 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
                                     object: Some(Object::Schema(schema)),
                                 }),
                                 state.clone(),
+                                cmd_pipe.clone(),
                             )
                         })
                         .collect(),
@@ -78,6 +84,7 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
                                 object: Some(Object::Table(table)),
                             }),
                             state.clone(),
+                            cmd_pipe.clone(),
                         )
                     })
                     .collect();
@@ -159,15 +166,22 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
                             ),
                         })
                         .on_enter(move |ctx| {
-                            let desc = ctx.descriptor;
-                            let mut state = tokio::task::block_in_place(|| state.blocking_lock());
-                            state.selected_object = Some(common::DbObjectDescriptor {
-                                descriptor: Some(
-                                    common::db_object_descriptor::Descriptor::Postgres(desc),
-                                ),
+                            {
+                                let desc = ctx.descriptor;
+                                let mut state =
+                                    tokio::task::block_in_place(|| state.blocking_lock());
+                                state.selected_object = Some(common::DbObjectDescriptor {
+                                    descriptor: Some(
+                                        common::db_object_descriptor::Descriptor::Postgres(desc),
+                                    ),
+                                });
+                            }
+                            // TODO: log if error
+                            let _ = tokio::task::block_in_place(|| {
+                                cmd_pipe.blocking_send(
+                                    super::app_state::QueryResultCmd::ListAllItemsFromObject,
+                                )
                             });
-                            state.query_result_cmd =
-                                Some(super::app_state::QueryResultCmd::ListAllItemsFromObject)
                         });
                 }
                 node
@@ -177,10 +191,14 @@ fn specification_node(specification: Specification, state: Arc<Mutex<AppState>>)
     }
 }
 
-fn object_node(object: common::DbObject, state: Arc<Mutex<AppState>>) -> Option<DbFileTreeNode> {
+fn object_node(
+    object: common::DbObject,
+    state: Arc<Mutex<AppState>>,
+    cmd_pipe: tokio::sync::mpsc::Sender<QueryResultCmd>,
+) -> Option<DbFileTreeNode> {
     object
         .specification
-        .map(|spec| specification_node(spec, state))
+        .map(|spec| specification_node(spec, state, cmd_pipe))
 }
 
 #[component]
@@ -208,6 +226,7 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
             let Some(connection) = state.lock().await.selected_connection.clone() else {
                 return;
             };
+            // TODO: log if error
             if let Ok(response) = client
                 .get_objects_of_connection(proto::objects::GetObjectsOfConnectionRequest {
                     connection: Some(connection),
@@ -219,11 +238,17 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
         });
     }
 
+    let Some(cmd_pipe) = props.cmd_pipe.as_ref() else {
+        return element! {
+            View
+        };
+    };
+
     let nodes: Vec<DbFileTreeNode> = objects
         .read()
         .iter()
         .cloned()
-        .filter_map(|obj| object_node(obj, props.state.clone()))
+        .filter_map(|obj| object_node(obj, props.state.clone(), cmd_pipe.clone()))
         .collect();
 
     let state = props.state.clone();

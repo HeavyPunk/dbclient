@@ -7,7 +7,7 @@ use config::Config;
 use iocraft::{element, ElementExt};
 use tokio::sync::Mutex;
 
-use crate::ui4::app_state::{AppState, Page};
+use crate::ui4::app_state::{AppState, Page, QueryResultCmd};
 mod cli;
 mod config;
 mod core;
@@ -37,47 +37,22 @@ async fn main() -> Result<()> {
             id: "default".to_string(),
         }),
         selected_object: None,
-        query_result_cmd: None,
         selected_page: Page::ConnectionsList,
         focus_widget: ui4::app_state::Widget::default(),
     }));
+
+    let (query_result_cmd_sender, query_result_cmd_reader) =
+        tokio::sync::mpsc::channel::<QueryResultCmd>(10);
 
     element!(ui4::app_state::AppContainer(
         connections_client: Some(connections_client),
         objects_client: Some(db_objects_client),
         queries_client: Some(queries_client),
         state: app_state,
+        query_result_cmd_pipe: Some(query_result_cmd_sender),
+        query_result_cmd_receiver: Some(query_result_cmd_reader),
     ))
     .render_loop()
     .await
     .context("app container execution error")
-
-    // element!(ui4::forms::add_record_to_object::AddRecordToObjectForm(
-    //     object: proto::common::DbObject {
-    //         specification: Some(proto::common::db_object::Specification::Postgres(proto::common::PostgresObject {
-    //             object: Some(proto::common::postgres_object::Object::Table(proto::common::PostgresTable {
-    //                 descriptor: None,
-    //                 columns: vec![
-    //                     proto::common::PostgresTableColumn {
-    //                         name: "field-name-1".to_string(),
-    //                         field: Some(proto::common::DbField {
-    //                             field: Some(proto::common::db_field::Field::I8(5))
-    //                         })
-    //                     },
-    //                     proto::common::PostgresTableColumn {
-    //                         name: "field-name-2".to_string(),
-    //                         field: Some(proto::common::DbField {
-    //                             field: Some(proto::common::db_field::Field::Str("hahaha".to_string()))
-    //                         })
-    //                     },
-    //                 ],
-    //                 constrains: vec![],
-    //                 indexes: vec![]
-    //             }))
-    //         }))
-    //     }
-    // ))
-    // .render_loop()
-    // .await
-    // .context("app container execution error")
 }

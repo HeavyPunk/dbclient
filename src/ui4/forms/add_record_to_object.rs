@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::anyhow;
 use iocraft::{
     component,
@@ -8,14 +6,13 @@ use iocraft::{
     hooks::{State, UseState, UseTerminalEvents},
     AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props,
 };
-use tokio::sync::Mutex;
 
-use crate::{core::proto, ui4::app_state::AppState};
+use crate::{core::proto, ui4::app_state::QueryResultCmd};
 
 #[derive(Default, Props)]
 pub struct AddRecordToObjectFormProps {
     pub object: proto::common::DbObject,
-    pub state: Arc<Mutex<AppState>>,
+    pub cmd_pipe: Option<tokio::sync::mpsc::Sender<QueryResultCmd>>,
 }
 
 #[component]
@@ -23,7 +20,6 @@ pub fn AddRecordToObjectForm(
     props: &AddRecordToObjectFormProps,
     mut hooks: Hooks,
 ) -> impl Into<AnyElement<'static>> {
-    let state = props.state.clone();
     let mut focused_field: State<Option<usize>> = hooks.use_state(|| None);
     let mut to_focus_field = hooks.use_state(|| 0usize);
     // Keep the complete specification in state so downstream components retain
@@ -32,6 +28,7 @@ pub fn AddRecordToObjectForm(
     let renderable_fields =
         specification_into_renderable(fields.read().as_ref()).unwrap_or_default();
     let fields_count = renderable_fields.len();
+    let cmd_pipe = props.cmd_pipe.clone();
 
     hooks.use_local_terminal_events(move |event| match event {
         iocraft::TerminalEvent::Key(KeyEvent { code, kind, .. })
@@ -39,9 +36,11 @@ pub fn AddRecordToObjectForm(
         {
             match code {
                 KeyCode::Esc if focused_field.read().is_none() => {
-                    let mut state = tokio::task::block_in_place(|| state.blocking_lock());
-                    state.query_result_cmd =
-                        Some(crate::ui4::app_state::QueryResultCmd::ClosePopup);
+                    tokio::task::block_in_place(|| {
+                        cmd_pipe
+                            .as_ref()
+                            .and_then(|ch| Some(ch.blocking_send(QueryResultCmd::ClosePopup)))
+                    });
                 }
                 KeyCode::Esc if focused_field.read().is_some() => {
                     focused_field.set(None);
@@ -64,10 +63,11 @@ pub fn AddRecordToObjectForm(
                     let record = fields.read().as_ref().and_then(specification_into_record);
 
                     if let Some(record) = record {
-                        let mut state = tokio::task::block_in_place(|| state.blocking_lock());
-                        state.query_result_cmd = Some(
-                            crate::ui4::app_state::QueryResultCmd::AddRecordToObject(record),
-                        );
+                        tokio::task::block_in_place(|| {
+                            cmd_pipe.as_ref().and_then(|ch| {
+                                Some(ch.blocking_send(QueryResultCmd::AddRecordToObject(record)))
+                            })
+                        });
                     }
                 }
                 _ => {}

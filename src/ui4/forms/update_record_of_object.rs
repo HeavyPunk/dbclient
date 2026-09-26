@@ -7,14 +7,16 @@ use iocraft::{
     hooks::{State, UseState, UseTerminalEvents},
     AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props,
 };
-use tokio::sync::Mutex;
 
-use crate::{core::proto, ui4::app_state::AppState};
+use crate::{
+    core::proto,
+    ui4::app_state::{AppState, QueryResultCmd},
+};
 
 #[derive(Default, Props)]
 pub struct UpdateRecordOfObjectFormProps {
     pub initial_record: proto::common::DbRecord,
-    pub state: Arc<Mutex<AppState>>,
+    pub cmd_pipe: Option<tokio::sync::mpsc::Sender<QueryResultCmd>>,
 }
 
 #[derive(Clone, Default)]
@@ -28,12 +30,12 @@ pub fn UpdateRecordOfObject(
     props: &UpdateRecordOfObjectFormProps,
     mut hooks: Hooks,
 ) -> impl Into<AnyElement<'static>> {
-    let state = props.state.clone();
     let old_record = props.initial_record.clone();
     let fields = hooks.use_state(|| record_fields(&props.initial_record));
     let mut focused_field: State<Option<usize>> = hooks.use_state(|| None);
     let mut to_focus_field = hooks.use_state(|| 0usize);
     let fields_count = fields.read().len();
+    let cmd_pipe = props.cmd_pipe.clone();
 
     hooks.use_local_terminal_events(move |event| match event {
         iocraft::TerminalEvent::Key(KeyEvent { code, kind, .. })
@@ -42,9 +44,11 @@ pub fn UpdateRecordOfObject(
             match code {
                 KeyCode::Esc if focused_field.read().is_some() => focused_field.set(None),
                 KeyCode::Esc => {
-                    let mut state = tokio::task::block_in_place(|| state.blocking_lock());
-                    state.query_result_cmd =
-                        Some(crate::ui4::app_state::QueryResultCmd::ClosePopup);
+                    tokio::task::block_in_place(|| {
+                        cmd_pipe
+                            .as_ref()
+                            .and_then(|ch| Some(ch.blocking_send(QueryResultCmd::ClosePopup)))
+                    });
                 }
                 KeyCode::Char('j') | KeyCode::Down if focused_field.read().is_none() => {
                     if fields_count > 0 {
@@ -59,12 +63,14 @@ pub fn UpdateRecordOfObject(
                 }
                 KeyCode::Enter if focused_field.read().is_none() => {
                     let new_record = fields_into_record(&old_record, &fields.read());
-                    let mut state = tokio::task::block_in_place(|| state.blocking_lock());
-                    state.query_result_cmd =
-                        Some(crate::ui4::app_state::QueryResultCmd::UpdateRecordOfObject(
-                            old_record.clone(),
-                            new_record,
-                        ));
+                    tokio::task::block_in_place(|| {
+                        cmd_pipe.as_ref().and_then(|ch| {
+                            Some(ch.blocking_send(QueryResultCmd::UpdateRecordOfObject(
+                                old_record.clone(),
+                                new_record,
+                            )))
+                        })
+                    });
                 }
                 _ => {}
             }

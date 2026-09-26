@@ -35,10 +35,15 @@ pub struct QueryResultProps {
     pub queries_client: Option<Arc<dyn proto::queries::QueriesService + Send + Sync>>,
     pub objects_client: Option<Arc<dyn proto::objects::ObjectsService + Send + Sync>>,
     pub state: Arc<Mutex<AppState>>,
+    pub cmd_pipe: Option<tokio::sync::mpsc::Sender<QueryResultCmd>>,
+    pub cmd_receiver: Option<tokio::sync::mpsc::Receiver<QueryResultCmd>>,
 }
 
 #[component]
-pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+pub fn QueryResult(
+    props: &mut QueryResultProps,
+    mut hooks: Hooks,
+) -> impl Into<AnyElement<'static>> {
     let mut to_visualize = hooks.use_state(|| DbRecord::default());
     let queries_client = props.queries_client.clone();
     let db_object_client = props.objects_client.clone();
@@ -48,21 +53,33 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
     let mut render_popup: iocraft::prelude::State<Option<Popup>> = hooks.use_state(|| None);
 
     let state = props.state.clone();
+    let Some(self_cmd_sender) = props.cmd_pipe.clone() else {
+        // TODO: maybe log this branch
+        return element! {
+            View
+        };
+    };
+    let cmd_receiver = props.cmd_receiver.take();
     hooks.use_future(async move {
+        let Some(mut cmd_receiver) = cmd_receiver else {
+            return;
+        };
         loop {
             tokio::time::sleep(Duration::from_millis(50)).await; // TODO: move to channels instead
                                                                  // of shared state
-            let mut state = state.lock().await;
-            match &state.query_result_cmd {
+            match cmd_receiver.recv().await {
                 Some(QueryResultCmd::ExecuteRawQuery) => {
                     todo!()
                 }
                 Some(QueryResultCmd::ListAllItemsFromObject) => {
-                    match (
-                        &queries_client,
-                        &state.selected_connection,
-                        &state.selected_object,
-                    ) {
+                    let (connection, object) = {
+                        let state = state.lock().await;
+                        (
+                            state.selected_connection.clone(),
+                            state.selected_object.clone(),
+                        )
+                    };
+                    match (&queries_client, &connection, &object) {
                         (Some(client), Some(selected_connection), Some(selected_object)) => {
                             let resp = client
                                 .list_all_items_from_object(
@@ -82,11 +99,14 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                     }
                 }
                 Some(QueryResultCmd::AddRecordToObject(record)) => {
-                    match (
-                        &queries_client,
-                        &state.selected_connection,
-                        &state.selected_object,
-                    ) {
+                    let (connection, object) = {
+                        let state = state.lock().await;
+                        (
+                            state.selected_connection.clone(),
+                            state.selected_object.clone(),
+                        )
+                    };
+                    match (&queries_client, &connection, &object) {
                         (Some(client), Some(selected_connection), Some(selected_object)) => {
                             let _r = client
                                 .add_record_to_object(proto::queries::AddRecordToObjectRequest {
@@ -99,15 +119,21 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                         }
                         _ => {}
                     }
-                    state.query_result_cmd = Some(QueryResultCmd::ClosePopup);
-                    continue;
+                    // TODO: log
+                    let _ = self_cmd_sender.send(QueryResultCmd::ClosePopup).await;
+                    let _ = self_cmd_sender
+                        .send(QueryResultCmd::ListAllItemsFromObject)
+                        .await;
                 }
                 Some(QueryResultCmd::RemoveRecordFromObject(record)) => {
-                    match (
-                        &queries_client,
-                        &state.selected_connection,
-                        &state.selected_object,
-                    ) {
+                    let (connection, object) = {
+                        let state = state.lock().await;
+                        (
+                            state.selected_connection.clone(),
+                            state.selected_object.clone(),
+                        )
+                    };
+                    match (&queries_client, &connection, &object) {
                         (Some(client), Some(selected_connection), Some(selected_object)) => {
                             let _r = client
                                 .remove_record_from_object(
@@ -122,13 +148,21 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                         }
                         _ => {}
                     }
+
+                    // TODO: log
+                    let _ = self_cmd_sender
+                        .send(QueryResultCmd::ListAllItemsFromObject)
+                        .await;
                 }
                 Some(QueryResultCmd::UpdateRecordOfObject(old_record, new_record)) => {
-                    match (
-                        &queries_client,
-                        &state.selected_connection,
-                        &state.selected_object,
-                    ) {
+                    let (connection, object) = {
+                        let state = state.lock().await;
+                        (
+                            state.selected_connection.clone(),
+                            state.selected_object.clone(),
+                        )
+                    };
+                    match (&queries_client, &connection, &object) {
                         (Some(client), Some(selected_connection), Some(selected_object)) => {
                             let _r = client
                                 .update_record_of_object(
@@ -144,20 +178,23 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                         }
                         _ => {}
                     }
-                    state.query_result_cmd = Some(QueryResultCmd::ClosePopup);
-                    continue;
+                    // TODO: log
+                    let _ = self_cmd_sender.send(QueryResultCmd::ClosePopup).await;
+                    let _ = self_cmd_sender
+                        .send(QueryResultCmd::ListAllItemsFromObject)
+                        .await;
                 }
                 Some(QueryResultCmd::OpenAddRecordPopup) => {
                     render_popup.set(Some(Popup::AddRecordToObject(false)));
                 }
                 Some(QueryResultCmd::ClosePopup) => {
+                    let mut state = state.lock().await;
                     selected_object.set(None);
                     render_popup.set(None);
                     state.focus_widget = crate::ui4::app_state::Widget::QueryResult;
                 }
                 _ => {}
             };
-            state.query_result_cmd = None;
         }
     });
 
@@ -229,7 +266,6 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
             #(
                 match (render_popup.read().as_ref(), selected_object.read().as_ref()) {
                     (Some(Popup::AddRecordToObject(true)), Some(obj)) => {
-                        let form_state = props.state.clone();
                         element! {
                             View(
                                 position: Position::Absolute,
@@ -239,15 +275,13 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                                 left: 4,
                             ) {
                                 AddRecordToObjectForm(
-                                    state: form_state,
                                     object: obj.clone(),
+                                    cmd_pipe: props.cmd_pipe.clone(),
                                 )
                             }
                         }
                     },
                     (Some(Popup::UpdateRecordOfObject(initial_record)), _) => {
-                        // dbg!(initial_record);
-                        let form_state = props.state.clone();
                         element! {
                             View(
                                 position: Position::Absolute,
@@ -257,8 +291,8 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                                 left: 4,
                             ) {
                                 UpdateRecordOfObject(
-                                    state: form_state,
                                     initial_record: initial_record.clone(),
+                                    cmd_pipe: props.cmd_pipe.clone(),
                                 )
                             }
                         }
@@ -279,6 +313,7 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                                     match postgres_record.record.as_ref() {
                                         Some(proto::common::postgres_record::Record::Table(table)) => {
                                             let table_callback_state = props.state.clone();
+                                            let cmd_sender = props.cmd_pipe.clone();
                                             element! {
                                                 TableView(
                                                     columns: table.rows.first().map(|row| row.columns.iter().map(|column| column.name.clone()).collect::<Vec<String>>()).unwrap_or_default(),
@@ -294,8 +329,7 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
 
                                                             }
                                                             KeyCode::Char('d') => {
-                                                                let mut state_guard = tokio::task::block_in_place(|| table_callback_state.blocking_lock());
-                                                                state_guard.query_result_cmd = Some(QueryResultCmd::RemoveRecordFromObject(proto::common::DbRecord {
+                                                                let cmd = QueryResultCmd::RemoveRecordFromObject(proto::common::DbRecord {
                                                                     specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
                                                                         record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
                                                                             rows: vec![PostgresRecordTableRow {
@@ -304,7 +338,8 @@ pub fn QueryResult(props: &QueryResultProps, mut hooks: Hooks) -> impl Into<AnyE
                                                                             }]
                                                                         }))
                                                                     }))
-                                                                }));
+                                                                });
+                                                                tokio::task::block_in_place(|| cmd_sender.as_ref().and_then(|ch| Some(ch.blocking_send(cmd))));
                                                             },
                                                             KeyCode::Char('i') => {
                                                                 let mut state_guard = tokio::task::block_in_place(|| table_callback_state.blocking_lock());
