@@ -7,14 +7,12 @@ A universal Terminal User Interface (TUI) client for database management with Vi
 ## Features
 
 ### Currently Supported
-- **Redis** - Read-only operations
-- **Read-only mode** - Browse and query your databases safely
-- **Executing custom query** - You can execute any query of any type (RW-mode)
+- **PostgreSQL support** - Partial integration with Postgres databases
+- **Operations** - Read, create, update, and delete functionality for PostgreSQL databases
 
 ### Planned Features
-- **PostgreSQL support** - Full integration with Postgres databases
+- **Redis support** - Full integration with Redis databases
 - **MySQL support** - Complete MySQL database management
-- **Write operations** - Create, update, and delete functionality for all supported databases
 - **UI improvements** - Better UI interactions (for example: horizontal scrolling)
 - **UX improvements** - For example: get notification about any error instead of fall to panic
 
@@ -50,30 +48,25 @@ dbclient --config-path config.toml
 #### Query page
 - Database objects widget:
     - `j|k|↑|↓` - Navigate through objects
-    - `/` - Search
-    - `n` - Go to next search pattern matching
-    - `N` - Go to previous search pattern matching
+    - `<Space>` - Open object sub-tree
     - `<Enter>` - Get all items in selected object
-    - `L|→` - Go to query result widget
+    - `l|→` - Go to query result widget
     - `<Esc>` - Quit to main page
 - Query result widget:
     - `j|k|↑|↓` - Navigate through records
-    - `/` - Search
-    - `n` - Go to next search pattern matching
-    - `N` - Go to previous search pattern matching
-    - `q` - Open query input popup
-    - `H|←` - Go to database objects widget
-    - `g` - Go to the first record (in future will be replaced with `gg`)
+    - `h|←` - Go to database objects widget
+    - `gg` - Go to the first record
     - `G` - Go to the last record
+    - `a` - Open popup to add record into database object
+    - `i` - Open popup to modify record of database object
+    - `dd` - Remove record of database object
     - `<Esc>` - Quit
-- Search popup:
-    - `i` - Activate insert mode
-    - `<Esc>` - If in insert mode then activate normal mode else - close popup
-    - `<Enter>` - In normal mode, apply search pattern. After this use `<Esc>` to close popup
-- Query popup:
-    - `i` - Activate insert mode
-    - `<Esc>` - If in insert mode then activate normal mode else - close popup
-    - `<Enter>` - In normal mode, apply query. After this use `<Esc>` to close popup
+- Popup:
+    - `j|k|↑|↓` - Navigate through fields
+    - `i` - Activate insert mode for selected field
+    - `<Esc>` in insert mode - Activate normal navigation mode through fields
+    - `<Esc>` in normal mode - Close popup
+    - `<Enter>` in normal mode - Apply operation
 
 ## Configuration
 
@@ -81,9 +74,9 @@ Create a configuration file any directory:
 
 ```toml
 [[connections]]
-connection_type = "Redis"
+connection_type = "Postgres"
 name = "local"
-connection_string = "redis://localhost:6379"
+connection_string = "postgresql://user:password@localhost/postgres?connect_timeout=10"
 ```
 
 ## Requirements
@@ -118,5 +111,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Built with [tui-realm](https://github.com/veeso/tui-realm) TUI framework
+- Built with [iocraft](https://github.com/ccbrown/iocraft) TUI framework
 - Inspired by various database GUI clients
