@@ -4,25 +4,27 @@ use dbclient::hotkey_manager::HotKeyManager;
 use futures::Stream;
 use iocraft::{Hook, Hooks, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, TerminalEvents};
 
-pub trait UseHotkeys<'a> {
+pub trait UseHotkeys {
     fn use_hotkeys<Registerer, FocusGetter>(
         &mut self,
         is_focused: FocusGetter,
         registerer: Registerer,
     ) where
-        Registerer:
-            FnMut(&mut HotKeyManager<(KeyCode, KeyModifiers, KeyEventKind), (), ()>) + Send + 'a,
+        Registerer: FnMut(&mut HotKeyManager<(KeyCode, KeyModifiers, KeyEventKind), (), ()>)
+            + Send
+            + 'static,
         FocusGetter: Fn() -> bool + Send + Unpin + 'static;
 }
 
-impl<'a> UseHotkeys<'a> for Hooks<'a, '_> {
+impl UseHotkeys for Hooks<'_, '_> {
     fn use_hotkeys<Registerer, FocusGetter>(
         &mut self,
         is_focused: FocusGetter,
         mut registerer: Registerer,
     ) where
-        Registerer:
-            FnMut(&mut HotKeyManager<(KeyCode, KeyModifiers, KeyEventKind), (), ()>) + Send + 'a,
+        Registerer: FnMut(&mut HotKeyManager<(KeyCode, KeyModifiers, KeyEventKind), (), ()>)
+            + Send
+            + 'static,
         FocusGetter: Fn() -> bool + Send + Unpin + 'static,
     {
         let mut hotkey_manager = HotKeyManager::new();

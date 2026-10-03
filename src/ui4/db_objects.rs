@@ -15,7 +15,7 @@ use crate::{
         common::{self, db_object::Specification, postgres_object::Object},
     },
     ui4::{
-        app_state::{AppState, QueryResultCmd, Widget},
+        app_state::{AppState, Page, QueryResultCmd, Widget},
         file_tree::{FileTree, FileTreeNode},
     },
 };
@@ -267,6 +267,9 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
         match code {
             KeyCode::Char('l') => {
                 state.focus_widget = Widget::QueryResult;
+            }
+            KeyCode::Esc => {
+                state.selected_page = Page::ConnectionsList;
             }
             _ => {}
         };

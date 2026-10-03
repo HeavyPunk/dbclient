@@ -15,8 +15,8 @@ use crate::{
         common::{db_field::Field, DbRecord, PostgresRecordTableRow},
     },
     ui4::{
-        app_state::{AppState, QueryResultCmd},
-        components::table_view::{table_key_handler, TableView},
+        app_state::{AppState, Page, QueryResultCmd},
+        components::table_view::{table_event_handler, TableView},
         forms::{
             add_record_to_object::AddRecordToObjectForm,
             update_record_of_object::UpdateRecordOfObject,
@@ -251,6 +251,9 @@ pub fn QueryResult(
             KeyCode::Char('h') => {
                 state.focus_widget = crate::ui4::app_state::Widget::DbObjects;
             }
+            KeyCode::Esc => {
+                state.selected_page = Page::ConnectionsList;
+            }
             _ => {}
         }
     });
@@ -312,7 +315,8 @@ pub fn QueryResult(
                                 #(
                                     match postgres_record.record.as_ref() {
                                         Some(proto::common::postgres_record::Record::Table(table)) => {
-                                            let table_callback_state = props.state.clone();
+                                            let table_callback_state_on_add = props.state.clone();
+                                            let table_callback_state_on_update = props.state.clone();
                                             let cmd_sender = props.cmd_pipe.clone();
                                             element! {
                                                 TableView(
@@ -320,44 +324,38 @@ pub fn QueryResult(
                                                     rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone()).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
                                                     has_focus: tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult),
                                                     selected_row: selected_row.read().clone(),
-                                                    on_key: Some(table_key_handler(move |code, (columns, row)| {
-                                                        match code {
-                                                            KeyCode::Char('a') => {
-                                                                let mut state_guard = tokio::task::block_in_place(|| table_callback_state.blocking_lock());
-                                                                render_popup.set(Some(Popup::AddRecordToObject(false)));
-                                                                state_guard.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
-
-                                                            }
-                                                            KeyCode::Char('d') => {
-                                                                let cmd = QueryResultCmd::RemoveRecordFromObject(proto::common::DbRecord {
-                                                                    specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
-                                                                        record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
-                                                                            rows: vec![PostgresRecordTableRow {
-                                                                                columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
-                                                                                values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
-                                                                            }]
-                                                                        }))
-                                                                    }))
-                                                                });
-                                                                tokio::task::block_in_place(|| cmd_sender.as_ref().and_then(|ch| Some(ch.blocking_send(cmd))));
-                                                            },
-                                                            KeyCode::Char('i') => {
-                                                                let mut state_guard = tokio::task::block_in_place(|| table_callback_state.blocking_lock());
-                                                                let initial_record = proto::common::DbRecord {
-                                                                    specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
-                                                                        record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
-                                                                            rows: vec![PostgresRecordTableRow {
-                                                                                columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
-                                                                                values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
-                                                                            }]
-                                                                        }))
-                                                                    }))
-                                                                };
-                                                                render_popup.set(Some(Popup::UpdateRecordOfObject(initial_record)));
-                                                                state_guard.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
-                                                            }
-                                                            _ => {}
-                                                        }
+                                                    on_add_row: Some(table_event_handler(move |_, _| {
+                                                        let mut state_guard = tokio::task::block_in_place(|| table_callback_state_on_add.blocking_lock());
+                                                        render_popup.set(Some(Popup::AddRecordToObject(false)));
+                                                        state_guard.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
+                                                    })),
+                                                    on_update_row: Some(table_event_handler(move |columns, row| {
+                                                        let mut state_guard = tokio::task::block_in_place(|| table_callback_state_on_update.blocking_lock());
+                                                        let initial_record = proto::common::DbRecord {
+                                                            specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
+                                                                record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
+                                                                    rows: vec![PostgresRecordTableRow {
+                                                                        columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
+                                                                        values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
+                                                                    }]
+                                                                }))
+                                                            }))
+                                                        };
+                                                        render_popup.set(Some(Popup::UpdateRecordOfObject(initial_record)));
+                                                        state_guard.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
+                                                    })),
+                                                    on_delete_row: Some(table_event_handler(move |columns, row| {
+                                                        let cmd = QueryResultCmd::RemoveRecordFromObject(proto::common::DbRecord {
+                                                            specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
+                                                                record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
+                                                                    rows: vec![PostgresRecordTableRow {
+                                                                        columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
+                                                                        values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
+                                                                    }]
+                                                                }))
+                                                            }))
+                                                        });
+                                                        tokio::task::block_in_place(|| cmd_sender.as_ref().and_then(|ch| Some(ch.blocking_send(cmd))));
                                                     }))
                                                 )
                                             }

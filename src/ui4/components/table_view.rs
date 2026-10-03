@@ -12,10 +12,10 @@ use tokio::sync::Mutex as TokioMutex;
 
 use crate::{core::proto::common::db_field::Field, ui4::control::UseHotkeys};
 
-pub type TableKeyHandler = Arc<Mutex<Box<dyn FnMut(KeyCode, (Vec<String>, Vec<Field>)) + Send>>>;
-pub fn table_key_handler<F>(callback: F) -> TableKeyHandler
+pub type TableEventHandler = Arc<Mutex<Box<dyn FnMut(Vec<String>, Vec<Field>) + Send>>>;
+pub fn table_event_handler<F>(callback: F) -> TableEventHandler
 where
-    F: FnMut(KeyCode, (Vec<String>, Vec<Field>)) + Send + 'static,
+    F: FnMut(Vec<String>, Vec<Field>) + Send + 'static,
 {
     Arc::new(Mutex::new(Box::new(callback)))
 }
@@ -26,7 +26,9 @@ pub struct TableViewProps {
     pub rows: Vec<Vec<Field>>,
     pub has_focus: bool,
     pub selected_row: Arc<TokioMutex<Option<usize>>>,
-    pub on_key: Option<TableKeyHandler>,
+    pub on_add_row: Option<TableEventHandler>,
+    pub on_update_row: Option<TableEventHandler>,
+    pub on_delete_row: Option<TableEventHandler>,
 }
 
 fn field_to_string(field: &Field) -> String {
@@ -57,9 +59,16 @@ fn field_to_string(field: &Field) -> String {
 pub fn TableView(props: &TableViewProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let mut cursor = hooks.use_state(|| 0usize);
     let mut scroll_handle = hooks.use_ref_default::<ScrollViewHandle>();
+
     let rows = props.rows.clone();
+    let mut rows_ref = hooks.use_ref(|| rows.clone());
+    rows_ref.set(rows.clone());
     let columns = props.columns.clone();
+    let mut columns_ref = hooks.use_ref(|| columns.clone());
+    columns_ref.set(columns.clone());
     let row_count = rows.len();
+    let mut row_count_ref = hooks.use_ref(|| row_count.clone());
+    row_count_ref.set(row_count.clone());
 
     if rows.is_empty() {
         cursor.set(0);
@@ -90,44 +99,29 @@ pub fn TableView(props: &TableViewProps, mut hooks: Hooks) -> impl Into<AnyEleme
         }
     }
 
-    let on_key = props.on_key.clone();
     let has_focus = props.has_focus;
-    let keybind_columns = columns.clone();
-    let keybind_rows = rows.clone();
-    hooks.use_local_terminal_events(move |event| {
-        if !has_focus {
-            return;
-        }
-        let TerminalEvent::Key(KeyEvent { code, kind, .. }) = event else {
-            return;
-        };
-        if kind == KeyEventKind::Release {
-            return;
-        }
 
-        if let Some(handler) = on_key.as_ref() {
-            if let Ok(mut handler) = handler.lock() {
-                let cur_pos = cursor.get();
-                let columns = keybind_columns.clone();
-                let row = keybind_rows.get(cur_pos).unwrap_or(&Vec::new()).clone();
-                handler(code, (columns, row));
-            }
-        }
-
-        match code {
-            KeyCode::Down | KeyCode::Char('j') if row_count > 0 => {
-                cursor.set((cursor.get() + 1).min(row_count - 1));
-            }
-            KeyCode::Up | KeyCode::Char('k') if row_count > 0 => {
-                cursor.set(cursor.get().saturating_sub(1));
-            }
-            _ => {}
-        }
-    });
+    let on_add_row = props.on_add_row.clone();
+    let on_update_row = props.on_update_row.clone();
+    let on_delete_row = props.on_delete_row.clone();
 
     hooks.use_hotkeys(
         move || has_focus,
         move |hotkey_manager| {
+            let _ = hotkey_manager.register(
+                &[(KeyCode::Char('k'), KeyModifiers::NONE, KeyEventKind::Press)],
+                move |_: &mut ()| {
+                    cursor.set(cursor.get().saturating_sub(1));
+                    Ok(())
+                },
+            );
+            let _ = hotkey_manager.register(
+                &[(KeyCode::Char('j'), KeyModifiers::NONE, KeyEventKind::Press)],
+                move |_: &mut ()| {
+                    cursor.set((cursor.get() + 1).min(row_count_ref.get() - 1));
+                    Ok(())
+                },
+            );
             let _ = hotkey_manager.register(
                 &[
                     (KeyCode::Char('g'), KeyModifiers::NONE, KeyEventKind::Press),
@@ -141,10 +135,70 @@ pub fn TableView(props: &TableViewProps, mut hooks: Hooks) -> impl Into<AnyEleme
             let _ = hotkey_manager.register(
                 &[(KeyCode::Char('G'), KeyModifiers::SHIFT, KeyEventKind::Press)],
                 move |_: &mut ()| {
-                    cursor.set(row_count.saturating_sub(1));
+                    cursor.set(row_count_ref.get().saturating_sub(1));
                     Ok(())
                 },
             );
+
+            {
+                let on_add_row = on_add_row.clone();
+                let _ = hotkey_manager.register(
+                    &[(KeyCode::Char('a'), KeyModifiers::NONE, KeyEventKind::Press)],
+                    move |_: &mut ()| {
+                        if let Some(handler) = on_add_row.as_ref() {
+                            if let Ok(mut handler) = handler.lock() {
+                                let cur_pos = cursor.get();
+                                let columns = columns_ref.read().clone();
+                                let row =
+                                    rows_ref.read().get(cur_pos).unwrap_or(&Vec::new()).clone();
+                                handler(columns, row);
+                            }
+                        }
+                        Ok(())
+                    },
+                );
+            }
+
+            {
+                let on_update_row = on_update_row.clone();
+                let _ = hotkey_manager.register(
+                    &[(KeyCode::Char('i'), KeyModifiers::NONE, KeyEventKind::Press)],
+                    move |_: &mut ()| {
+                        if let Some(handler) = on_update_row.as_ref() {
+                            if let Ok(mut handler) = handler.lock() {
+                                let cur_pos = cursor.get();
+                                let columns = columns_ref.read().clone();
+                                let row =
+                                    rows_ref.read().get(cur_pos).unwrap_or(&Vec::new()).clone();
+                                handler(columns, row);
+                            }
+                        }
+                        Ok(())
+                    },
+                );
+            }
+
+            {
+                let on_delete_row = on_delete_row.clone();
+                let _ = hotkey_manager.register(
+                    &[
+                        (KeyCode::Char('d'), KeyModifiers::NONE, KeyEventKind::Press),
+                        (KeyCode::Char('d'), KeyModifiers::NONE, KeyEventKind::Press),
+                    ],
+                    move |_: &mut ()| {
+                        if let Some(handler) = on_delete_row.as_ref() {
+                            if let Ok(mut handler) = handler.lock() {
+                                let cur_pos = cursor.get();
+                                let columns = columns_ref.read().clone();
+                                let row =
+                                    rows_ref.read().get(cur_pos).unwrap_or(&Vec::new()).clone();
+                                handler(columns, row);
+                            }
+                        }
+                        Ok(())
+                    },
+                );
+            }
         },
     );
 

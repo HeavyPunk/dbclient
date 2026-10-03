@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use iocraft::{
     component,
     components::{Text, TextInput, View},
@@ -124,7 +122,12 @@ fn FormTextInput(props: &FormTextInputProps, _hooks: Hooks) -> impl Into<AnyElem
 
     element! {
         View(width: 100pct) {
-            View(margin_right: 1) { Text(content: props.field.name.clone()) }
+            View(margin_right: 1) {
+                Text(
+                    content: props.field.name.clone(),
+                    color: Color::Blue
+                )
+            }
             View(
                 background_color: if props.has_focus { Some(Color::DarkGrey) } else { None },
                 width: 90pct, height: 1,

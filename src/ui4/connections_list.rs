@@ -4,9 +4,9 @@ use iocraft::{
     component,
     components::{BorderStyle, Text, TextDecoration, View},
     element,
-    hooks::{UseFuture, UseState, UseTerminalEvents, UseTerminalSize},
+    hooks::{UseContext, UseFuture, UseState, UseTerminalEvents, UseTerminalSize},
     AnyElement, Color, Edges, FlexDirection, Hooks, JustifyContent, KeyCode, KeyEvent,
-    KeyEventKind, KeyModifiers, Props, TerminalEvent, Weight,
+    KeyEventKind, KeyModifiers, Props, SystemContext, TerminalEvent, Weight,
 };
 use tokio::sync::Mutex;
 
@@ -31,6 +31,8 @@ pub async fn ConnectionsList(
 ) -> impl Into<AnyElement<'static>> {
     let connections = hooks.use_state(Vec::<proto::connections::Connection>::new);
     let mut selected_row = hooks.use_state(|| 0);
+    let mut system = hooks.use_context_mut::<SystemContext>();
+    let mut should_exit = hooks.use_state(|| false);
 
     if let Some(client) = props.connections_client.clone() {
         let mut connections = connections.clone();
@@ -67,6 +69,10 @@ pub async fn ConnectionsList(
         },
     );
 
+    if should_exit.get() {
+        system.exit();
+    }
+
     let state = props.state.clone();
     hooks.use_terminal_events({
         move |event| match event {
@@ -97,6 +103,9 @@ pub async fn ConnectionsList(
                         guard.selected_connection = Some(conn.unwrap().clone());
                         guard.selected_page = Page::QueryArea;
                     }
+                    KeyCode::Esc => {
+                        should_exit.set(true);
+                    }
                     _ => {}
                 }
             }
@@ -122,15 +131,30 @@ pub async fn ConnectionsList(
             }
 
             #(connections.read().iter().enumerate().map(|(i, connection)| element! {
-                // View(background_color: if selected_row.get() == i { Some(Color::Blue) } else { if i % 2 == 0 {None} else {Some(Color::DarkGrey)} }) {
                 View(
-                    background_color: if selected_row.get() == i { Some(Color::Blue) } else { None },
+                    background_color: if selected_row.get() == i {
+                        Some(Color::Blue)
+                    } else if i % 2 == 0 {
+                        None
+                    } else {
+                        Some(Color::DarkGrey)
+                    }
                 ) {
                     View(width: 50pct, justify_content: JustifyContent::Start, padding_right: 2) {
-                        Text(content: connection.id.clone(), color: if selected_row.get() == i {Some(Color::Black)} else {None})
+                        Text(
+                            content: connection.id.clone(),
+                            color: if selected_row.get() == i || i % 2 != 0 {
+                                Some(Color::Black)
+                            } else {None}
+                        )
                     }
                     View(width: 50pct, justify_content: JustifyContent::Center, padding_right: 2) {
-                        Text(content: "TODO".to_string(), color: if selected_row.get() == i {Some(Color::Black)} else {None})
+                        Text(
+                            content: "TODO".to_string(),
+                            color: if selected_row.get() == i || i % 2 != 0 {
+                                Some(Color::Black)
+                            } else {None}
+                        )
                     }
                 }
             }))
