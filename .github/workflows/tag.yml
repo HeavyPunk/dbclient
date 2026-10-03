@@ -1,0 +1,25 @@
+name: Tag master
+
+on:
+  push:
+    branches: [ "master" ]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')
+
+          gh api \
+            --method POST \
+            "/repos/${{ github.repository }}/git/refs" \
+            -f ref="refs/tags/$TAG" \
+            -f sha="${{ github.sha }}"

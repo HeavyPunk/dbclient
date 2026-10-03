@@ -318,12 +318,13 @@ dependencies = [
 
 [[package]]
 name = "dbclient"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
  "clap",
+ "futures",
  "iocraft",
  "prost",
  "prost-build",
