@@ -1,6 +1,7 @@
 pub mod app_state;
 pub mod components;
 pub mod connections_list;
+pub mod control;
 pub mod db_objects;
 pub mod file_tree;
 pub mod forms;

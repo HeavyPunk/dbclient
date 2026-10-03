@@ -6,13 +6,16 @@ use iocraft::{
     element,
     hooks::{UseFuture, UseState, UseTerminalEvents, UseTerminalSize},
     AnyElement, Color, Edges, FlexDirection, Hooks, JustifyContent, KeyCode, KeyEvent,
-    KeyEventKind, Props, TerminalEvent, Weight,
+    KeyEventKind, KeyModifiers, Props, TerminalEvent, Weight,
 };
 use tokio::sync::Mutex;
 
 use crate::{
     core::proto::{self, connections::GetAvailableConnectionsRequest},
-    ui4::app_state::{AppState, Page},
+    ui4::{
+        app_state::{AppState, Page},
+        control::UseHotkeys,
+    },
 };
 
 #[derive(Default, Props)]
@@ -40,6 +43,29 @@ pub async fn ConnectionsList(
             }
         });
     }
+
+    hooks.use_hotkeys(
+        || true,
+        move |hot_key_manager| {
+            let _ = hot_key_manager.register(
+                &[
+                    (KeyCode::Char('g'), KeyModifiers::NONE, KeyEventKind::Press),
+                    (KeyCode::Char('g'), KeyModifiers::NONE, KeyEventKind::Press),
+                ],
+                move |_: &mut ()| {
+                    selected_row.set(0);
+                    Ok(())
+                },
+            );
+            let _ = hot_key_manager.register(
+                &[(KeyCode::Char('G'), KeyModifiers::SHIFT, KeyEventKind::Press)],
+                move |_: &mut ()| {
+                    selected_row.set(connections.read().len().saturating_sub(1));
+                    Ok(())
+                },
+            );
+        },
+    );
 
     let state = props.state.clone();
     hooks.use_terminal_events({

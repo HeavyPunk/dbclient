@@ -5,12 +5,12 @@ use iocraft::{
     components::{BorderStyle, ScrollView, ScrollViewHandle, Text, View},
     element,
     hooks::{UseRef, UseState, UseTerminalEvents},
-    AnyElement, Color, Edges, FlexDirection, Hooks, KeyCode, KeyEvent, KeyEventKind, Props,
-    TerminalEvent,
+    AnyElement, Color, Edges, FlexDirection, Hooks, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+    Props, TerminalEvent,
 };
 use tokio::sync::Mutex as TokioMutex;
 
-use crate::core::proto::common::db_field::Field;
+use crate::{core::proto::common::db_field::Field, ui4::control::UseHotkeys};
 
 pub type TableKeyHandler = Arc<Mutex<Box<dyn FnMut(KeyCode, (Vec<String>, Vec<Field>)) + Send>>>;
 pub fn table_key_handler<F>(callback: F) -> TableKeyHandler
@@ -124,6 +124,29 @@ pub fn TableView(props: &TableViewProps, mut hooks: Hooks) -> impl Into<AnyEleme
             _ => {}
         }
     });
+
+    hooks.use_hotkeys(
+        move || has_focus,
+        move |hotkey_manager| {
+            let _ = hotkey_manager.register(
+                &[
+                    (KeyCode::Char('g'), KeyModifiers::NONE, KeyEventKind::Press),
+                    (KeyCode::Char('g'), KeyModifiers::NONE, KeyEventKind::Press),
+                ],
+                move |_: &mut ()| {
+                    cursor.set(0);
+                    Ok(())
+                },
+            );
+            let _ = hotkey_manager.register(
+                &[(KeyCode::Char('G'), KeyModifiers::SHIFT, KeyEventKind::Press)],
+                move |_: &mut ()| {
+                    cursor.set(row_count.saturating_sub(1));
+                    Ok(())
+                },
+            );
+        },
+    );
 
     element! {
         View(width: 100pct, height: 100pct, flex_direction: FlexDirection::Column) {

@@ -324,6 +324,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
+ "futures",
  "iocraft",
  "prost",
  "prost-build",
