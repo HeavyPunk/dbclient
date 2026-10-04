@@ -17,7 +17,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')
+          VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')
+          if [[ -n "$VERSION" ]]; then
+              echo "VERSION is empty"
+              exit -1
+          fi
+          TAG="v$VERSION"
 
           gh api \
             --method POST \
