@@ -4,11 +4,10 @@ use iocraft::{
     component,
     components::{BorderStyle, ScrollView, ScrollViewHandle, Text, View},
     element,
-    hooks::{UseRef, UseState, UseTerminalEvents},
-    AnyElement, Color, Edges, FlexDirection, Hooks, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
-    Props, TerminalEvent,
+    hooks::{UseRef, UseState},
+    AnyElement, Color, Edges, FlexDirection, Hooks, KeyCode, KeyEventKind, KeyModifiers,
+    Props,
 };
-use tokio::sync::Mutex as TokioMutex;
 
 use crate::{core::proto::common::db_field::Field, ui4::control::UseHotkeys};
 
@@ -25,7 +24,6 @@ pub struct TableViewProps {
     pub columns: Vec<String>,
     pub rows: Vec<Vec<Field>>,
     pub has_focus: bool,
-    pub selected_row: Arc<TokioMutex<Option<usize>>>,
     pub on_add_row: Option<TableEventHandler>,
     pub on_update_row: Option<TableEventHandler>,
     pub on_delete_row: Option<TableEventHandler>,
@@ -71,17 +69,12 @@ pub fn TableView(props: &TableViewProps, mut hooks: Hooks) -> impl Into<AnyEleme
     row_count_ref.set(row_count.clone());
 
     if rows.is_empty() {
-        cursor.set(0);
+        if cursor.get() != 0 {
+            cursor.set(0);
+        }
     } else if cursor.get() >= rows.len() {
         cursor.set(rows.len() - 1);
     }
-
-    let current_row = if rows.is_empty() {
-        None
-    } else {
-        Some(cursor.get())
-    };
-    tokio::task::block_in_place(|| *props.selected_row.blocking_lock() = current_row);
 
     let cursor_index = cursor.get();
     let viewport_height = scroll_handle.read().viewport_height().max(0) as usize;

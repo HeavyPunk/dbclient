@@ -36,9 +36,7 @@ pub fn UpdateRecordOfObject(
     let cmd_pipe = props.cmd_pipe.clone();
 
     hooks.use_local_terminal_events(move |event| match event {
-        iocraft::TerminalEvent::Key(KeyEvent { code, kind, .. })
-            if kind != KeyEventKind::Release =>
-        {
+        iocraft::TerminalEvent::Key(KeyEvent { code, kind, .. }) if kind == KeyEventKind::Press => {
             match code {
                 KeyCode::Esc if focused_field.read().is_some() => focused_field.set(None),
                 KeyCode::Esc => {
