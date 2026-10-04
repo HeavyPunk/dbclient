@@ -48,7 +48,6 @@ pub fn QueryResult(
     let queries_client = props.queries_client.clone();
     let db_object_client = props.objects_client.clone();
     let mut selected_object = hooks.use_state(|| None);
-    let selected_row = hooks.use_state(|| Arc::new(Mutex::new(None::<usize>)));
 
     let mut render_popup: iocraft::prelude::State<Option<Popup>> = hooks.use_state(|| None);
 
@@ -188,9 +187,13 @@ pub fn QueryResult(
                     render_popup.set(Some(Popup::AddRecordToObject(false)));
                 }
                 Some(QueryResultCmd::ClosePopup) => {
-                    let mut state = state.lock().await;
+                    // NOTE: wait until other widgets hooks observe event as trash before enable
+                    // QueryResult widget as event consumer
+                    // see race condition problem here in hooks.use_local_terminal_events
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                     selected_object.set(None);
                     render_popup.set(None);
+                    let mut state = state.lock().await;
                     state.focus_widget = crate::ui4::app_state::Widget::QueryResult;
                 }
                 _ => {}
@@ -323,7 +326,6 @@ pub fn QueryResult(
                                                     columns: table.rows.first().map(|row| row.columns.iter().map(|column| column.name.clone()).collect::<Vec<String>>()).unwrap_or_default(),
                                                     rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone()).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
                                                     has_focus: tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult),
-                                                    selected_row: selected_row.read().clone(),
                                                     on_add_row: Some(table_event_handler(move |_, _| {
                                                         let mut state_guard = tokio::task::block_in_place(|| table_callback_state_on_add.blocking_lock());
                                                         render_popup.set(Some(Popup::AddRecordToObject(false)));
@@ -365,7 +367,6 @@ pub fn QueryResult(
                                                 columns: Vec::<String>::new(),
                                                 rows: Vec::<Vec<Field>>::new(),
                                                 has_focus: false,
-                                                selected_row: selected_row.read().clone(),
                                             )
                                         },
                                     }
