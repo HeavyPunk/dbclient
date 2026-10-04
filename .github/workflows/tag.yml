@@ -18,7 +18,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')
-          if [[ -n "$VERSION" ]]; then
+          if [[ -z "$VERSION" ]]; then
               echo "VERSION is empty"
               exit -1
           fi
