@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use iocraft::{component, components::View, element, AnyElement, Props};
+use iocraft::{component, components::View, element, hooks::UseState, AnyElement, Hooks, Props};
 use tokio::sync::Mutex;
 
 use crate::{
@@ -17,12 +17,22 @@ pub struct QueryAreaProps {
     pub objects_client: Option<Arc<dyn proto::objects::ObjectsService + Send + Sync>>,
     pub queries_client: Option<Arc<dyn proto::queries::QueriesService + Send + Sync>>,
     pub state: Arc<Mutex<AppState>>,
-    pub query_result_cmd_pipe: Option<tokio::sync::mpsc::Sender<QueryResultCmd>>,
-    pub query_result_cmd_receiver: Option<tokio::sync::mpsc::Receiver<QueryResultCmd>>,
 }
 
 #[component]
-pub fn QueryArea(props: &mut QueryAreaProps) -> impl Into<AnyElement<'static>> {
+pub async fn QueryArea(
+    props: &mut QueryAreaProps,
+    mut hooks: Hooks,
+) -> impl Into<AnyElement<'static>> {
+    let chan = hooks.use_state(|| {
+        let (query_result_cmd_sender, query_result_cmd_reader) =
+            tokio::sync::mpsc::channel::<QueryResultCmd>(10);
+        return (
+            query_result_cmd_sender,
+            Arc::new(Mutex::new(query_result_cmd_reader)),
+        );
+    });
+
     element! {
         View (
             width: 100pct,
@@ -31,7 +41,7 @@ pub fn QueryArea(props: &mut QueryAreaProps) -> impl Into<AnyElement<'static>> {
             View (width: 30pct) {
                 DbObjects(
                     objects_client: props.objects_client.clone(),
-                    cmd_pipe: props.query_result_cmd_pipe.clone(),
+                    cmd_pipe: Some(chan.read().0.clone()),
                     state: props.state.clone()
                 )
             }
@@ -41,8 +51,8 @@ pub fn QueryArea(props: &mut QueryAreaProps) -> impl Into<AnyElement<'static>> {
                     queries_client: props.queries_client.clone(),
                     objects_client: props.objects_client.clone(),
                     state: props.state.clone(),
-                    cmd_pipe: props.query_result_cmd_pipe.clone(),
-                    cmd_receiver: props.query_result_cmd_receiver.take(),
+                    cmd_pipe: Some(chan.read().0.clone()),
+                    cmd_receiver: Some(chan.read().1.clone()),
                 )
             }
         }

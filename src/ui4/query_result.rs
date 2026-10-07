@@ -36,7 +36,7 @@ pub struct QueryResultProps {
     pub objects_client: Option<Arc<dyn proto::objects::ObjectsService + Send + Sync>>,
     pub state: Arc<Mutex<AppState>>,
     pub cmd_pipe: Option<tokio::sync::mpsc::Sender<QueryResultCmd>>,
-    pub cmd_receiver: Option<tokio::sync::mpsc::Receiver<QueryResultCmd>>,
+    pub cmd_receiver: Option<Arc<Mutex<tokio::sync::mpsc::Receiver<QueryResultCmd>>>>,
 }
 
 #[component]
@@ -58,15 +58,19 @@ pub fn QueryResult(
             View
         };
     };
-    let cmd_receiver = props.cmd_receiver.take();
-    hooks.use_future(async move {
-        let Some(mut cmd_receiver) = cmd_receiver else {
-            return;
+    let Some(cmd_receiver) = props.cmd_receiver.clone() else {
+        // TODO: maybe log this branch
+        return element! {
+            View
         };
+    };
+    hooks.use_future(async move {
         loop {
-            tokio::time::sleep(Duration::from_millis(50)).await; // TODO: move to channels instead
-                                                                 // of shared state
-            match cmd_receiver.recv().await {
+            let cmd = {
+                let mut receiver = cmd_receiver.lock().await;
+                receiver.recv().await
+            };
+            match cmd {
                 Some(QueryResultCmd::ExecuteRawQuery) => {
                     todo!()
                 }
