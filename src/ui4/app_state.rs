@@ -2,9 +2,9 @@ use std::{sync::Arc, time::Duration};
 
 use iocraft::{
     component,
-    components::{Text, View},
+    components::View,
     element,
-    hooks::{UseFuture, UseState, UseTerminalEvents, UseTerminalSize},
+    hooks::{UseFuture, UseState, UseTerminalSize},
     AnyElement, Hooks, Props,
 };
 use tokio::sync::Mutex;
@@ -115,8 +115,6 @@ pub fn AppContainer(
                             queries_client: props.queries_client.clone(),
                             objects_client: props.objects_client.clone(),
                             state: props.state.clone(),
-                            query_result_cmd_pipe: props.query_result_cmd_pipe.clone(),
-                            query_result_cmd_receiver: props.query_result_cmd_receiver.take(),
                         )
                     }
                 },

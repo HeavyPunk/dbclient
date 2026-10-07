@@ -5,8 +5,7 @@ use iocraft::{
     components::{BorderStyle, ScrollView, ScrollViewHandle, Text, View},
     element,
     hooks::{UseRef, UseState},
-    AnyElement, Color, Edges, FlexDirection, Hooks, KeyCode, KeyEventKind, KeyModifiers,
-    Props,
+    AnyElement, Color, Edges, FlexDirection, Hooks, KeyCode, KeyEventKind, KeyModifiers, Props,
 };
 
 use crate::{core::proto::common::db_field::Field, ui4::control::UseHotkeys};
