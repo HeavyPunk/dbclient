@@ -110,7 +110,7 @@ pub fn TableView(props: &TableViewProps, mut hooks: Hooks) -> impl Into<AnyEleme
             let _ = hotkey_manager.register(
                 &[(KeyCode::Char('j'), KeyModifiers::NONE, KeyEventKind::Press)],
                 move |_: &mut ()| {
-                    cursor.set((cursor.get() + 1).min(row_count_ref.get() - 1));
+                    cursor.set((cursor.get() + 1).min(row_count_ref.get().saturating_sub(1)));
                     Ok(())
                 },
             );

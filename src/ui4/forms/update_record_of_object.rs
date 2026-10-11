@@ -166,7 +166,8 @@ fn record_fields(record: &proto::common::DbRecord) -> Vec<RecordField> {
     let Some(row) = table.rows.first() else {
         return vec![];
     };
-    row.columns
+    table
+        .columns
         .iter()
         .zip(row.values.iter())
         .map(|(column, value)| RecordField {

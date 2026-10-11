@@ -19,12 +19,12 @@ message PostgresRecord {
 
 message PostgresRecordTable {
   // PostgresTableColumn is column descriptor
-  repeated PostgresRecordTableRow rows = 1;
+  repeated PostgresTableColumn columns = 1;
+  repeated PostgresRecordTableRow rows = 2;
 }
 
 message PostgresRecordTableRow {
-  repeated PostgresTableColumn columns = 1;
-  repeated DbField values = 2;
+  repeated DbField values = 1;
 }
 
 // -----------------------------------------
