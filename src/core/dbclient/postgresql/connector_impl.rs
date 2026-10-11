@@ -460,20 +460,49 @@ impl Connector for PostgresConnector {
                     )
                 }
             };
-            let query = format!("SELECT * FROM {}", table_name);
+
+            let columns: Vec<(String, String)> = {
+                let query = format!(
+                    "
+                    SELECT
+                        column_name,
+                        data_type
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = '{}'
+                    ORDER BY ordinal_position;
+                    ",
+                    table_name
+                );
+                let rows = client.query(&query, &[]).await?;
+                let mut columns = vec![];
+                for row in rows {
+                    let column_name: String = row.get("column_name");
+                    let data_type: String = row.get("data_type");
+                    columns.push((column_name, data_type));
+                }
+                columns
+            };
+
+            let query = format!(
+                "SELECT {} FROM {}",
+                columns
+                    .iter()
+                    .map(|column| column.0.clone())
+                    .collect::<Vec<_>>()
+                    .join(","),
+                table_name
+            );
             let rows = client.query(&query, &[]).await?;
             let mut proto_rows = vec![];
             for row in rows {
-                let mut proto_row = proto::common::PostgresRecordTableRow {
-                    columns: vec![],
-                    values: vec![],
-                };
+                let mut proto_row = proto::common::PostgresRecordTableRow { values: vec![] };
                 let columns = row.columns();
                 for column in columns {
                     let name = column.name();
-                    let column_name = column.type_().name();
+                    let column_type_name = column.type_().name();
                     let value =
-                        match column_name {
+                        match column_type_name {
                             "bool" => {
                                 let value: Option<bool> = row.try_get(name)?;
                                 proto::common::DbField {
@@ -537,11 +566,6 @@ impl Connector for PostgresConnector {
                                 ),
                             ),
                         };
-                    let field_type = proto::common::DbField::from_pg_type(column_name);
-                    proto_row.columns.push(proto::common::PostgresTableColumn {
-                        name: name.to_string(),
-                        field: Some(field_type),
-                    });
                     proto_row.values.push(value);
                 }
                 proto_rows.push(proto_row);
@@ -550,7 +574,18 @@ impl Connector for PostgresConnector {
                 specification: Some(proto::common::db_record::Specification::Postgres(
                     proto::common::PostgresRecord {
                         record: Some(proto::common::postgres_record::Record::Table(
-                            proto::common::PostgresRecordTable { rows: proto_rows },
+                            proto::common::PostgresRecordTable {
+                                columns: columns
+                                    .iter()
+                                    .map(|column| proto::common::PostgresTableColumn {
+                                        name: column.0.clone(),
+                                        field: Some(proto::common::DbField::from_pg_type(
+                                            &column.1,
+                                        )),
+                                    })
+                                    .collect(),
+                                rows: proto_rows,
+                            },
                         )),
                     },
                 )),
@@ -586,7 +621,7 @@ impl Connector for PostgresConnector {
             ) => {
                 //NOTE: on invalid table, whole operation should be rejected
                 for row in &table.rows {
-                    if row.columns.len() != row.values.len() {
+                    if table.columns.len() != row.values.len() {
                         return Err(
                             crate::core::dbclient::connector::ConnectorError::InvalidRequest(
                                 "columns and values should have equal size",
@@ -607,7 +642,7 @@ impl Connector for PostgresConnector {
                 for row in &table.rows {
                     let mut columns = vec![];
                     let mut fields = vec![];
-                    for (col, field) in row.columns.iter().zip(row.values.iter()) {
+                    for (col, field) in table.columns.iter().zip(row.values.iter()) {
                         let Some(rendered_field) = field.into_sql_value() else {
                             continue;
                         };
@@ -663,7 +698,7 @@ impl Connector for PostgresConnector {
             ) => {
                 //NOTE: on invalid table, whole operation should be rejected
                 for row in &table.rows {
-                    if row.columns.len() != row.values.len() {
+                    if table.columns.len() != row.values.len() {
                         return Err(
                             crate::core::dbclient::connector::ConnectorError::InvalidRequest(
                                 "columns and values should have equal size",
@@ -683,7 +718,7 @@ impl Connector for PostgresConnector {
                 let transaction = client.transaction().await?;
                 for row in &table.rows {
                     let mut filters = vec![];
-                    for (col, field) in row.columns.iter().zip(row.values.iter()) {
+                    for (col, field) in table.columns.iter().zip(row.values.iter()) {
                         let Some(rendered_field) = field.into_sql_value() else {
                             continue;
                         };
@@ -740,7 +775,7 @@ impl Connector for PostgresConnector {
             ) => {
                 //NOTE: on invalid table, whole operation should be rejected
                 for row in &old_table.rows {
-                    if row.columns.len() != row.values.len() {
+                    if old_table.columns.len() != row.values.len() {
                         return Err(
                             crate::core::dbclient::connector::ConnectorError::InvalidRequest(
                                 "columns and values should have equal size",
@@ -749,7 +784,7 @@ impl Connector for PostgresConnector {
                     }
                 }
                 for row in &new_table.rows {
-                    if row.columns.len() != row.values.len() {
+                    if new_table.columns.len() != row.values.len() {
                         return Err(
                             crate::core::dbclient::connector::ConnectorError::InvalidRequest(
                                 "columns and values should have equal size",
@@ -770,7 +805,7 @@ impl Connector for PostgresConnector {
 
                 for (old_row, new_row) in old_table.rows.iter().zip(new_table.rows) {
                     let mut filter = vec![];
-                    for (col, field) in old_row.columns.iter().zip(old_row.values.iter()) {
+                    for (col, field) in old_table.columns.iter().zip(old_row.values.iter()) {
                         let Some(rendered_field) = field.into_sql_value() else {
                             continue;
                         };
@@ -782,7 +817,7 @@ impl Connector for PostgresConnector {
                     let filter = filter.join(" AND ");
 
                     let mut replaces = vec![];
-                    for (col, field) in new_row.columns.iter().zip(new_row.values.iter()) {
+                    for (col, field) in new_table.columns.iter().zip(new_row.values.iter()) {
                         let Some(rendered_field) = field.into_sql_value() else {
                             continue;
                         };

@@ -287,8 +287,8 @@ fn specification_into_record(
             proto::common::PostgresRecord {
                 record: Some(proto::common::postgres_record::Record::Table(
                     proto::common::PostgresRecordTable {
+                        columns: table.columns.clone(),
                         rows: vec![proto::common::PostgresRecordTableRow {
-                            columns: table.columns.clone(),
                             values: table
                                 .columns
                                 .iter()

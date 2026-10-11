@@ -327,7 +327,7 @@ pub fn QueryResult(
                                             let cmd_sender = props.cmd_pipe.clone();
                                             element! {
                                                 TableView(
-                                                    columns: table.rows.first().map(|row| row.columns.iter().map(|column| column.name.clone()).collect::<Vec<String>>()).unwrap_or_default(),
+                                                    columns: table.columns.iter().map(|column| column.name.clone()).collect::<Vec<_>>(),
                                                     rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone()).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
                                                     has_focus: tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult),
                                                     on_add_row: Some(table_event_handler(move |_, _| {
@@ -340,8 +340,8 @@ pub fn QueryResult(
                                                         let initial_record = proto::common::DbRecord {
                                                             specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
                                                                 record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
+                                                                    columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
                                                                     rows: vec![PostgresRecordTableRow {
-                                                                        columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
                                                                         values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
                                                                     }]
                                                                 }))
@@ -354,8 +354,8 @@ pub fn QueryResult(
                                                         let cmd = QueryResultCmd::RemoveRecordFromObject(proto::common::DbRecord {
                                                             specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
                                                                 record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
+                                                                    columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
                                                                     rows: vec![PostgresRecordTableRow {
-                                                                        columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
                                                                         values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
                                                                     }]
                                                                 }))
