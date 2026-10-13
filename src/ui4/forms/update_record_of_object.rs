@@ -1,9 +1,9 @@
 use iocraft::{
     component,
-    components::{Text, TextInput, View},
+    components::{ScrollView, ScrollViewHandle, Text, TextInput, View},
     element,
-    hooks::{State, UseState, UseTerminalEvents},
-    AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props,
+    hooks::{State, UseComponentRect, UseRef, UseState, UseTerminalEvents},
+    AnyElement, Color, Hooks, JustifyContent, KeyCode, KeyEvent, KeyEventKind, Props,
 };
 
 use crate::{
@@ -21,6 +21,7 @@ pub struct UpdateRecordOfObjectFormProps {
 struct RecordField {
     name: String,
     value: proto::common::DbField,
+    draft: String,
 }
 
 #[component]
@@ -33,7 +34,34 @@ pub fn UpdateRecordOfObject(
     let mut focused_field: State<Option<usize>> = hooks.use_state(|| None);
     let mut to_focus_field = hooks.use_state(|| 0usize);
     let fields_count = fields.read().len();
+    let mut scroll_handle = hooks.use_ref_default::<ScrollViewHandle>();
+    let field_heights = hooks.use_state(|| vec![1usize; fields_count]);
     let cmd_pipe = props.cmd_pipe.clone();
+    let fields_for_submit = fields.clone();
+
+    let selected_index = to_focus_field.get();
+    let field_heights_ref = field_heights.read();
+    let selected_top = (0..selected_index)
+        .map(|index| field_heights_ref.get(index).copied().unwrap_or(1) + 2) // NOTE: +2 is borders
+        .sum::<usize>();
+    let selected_height = field_heights_ref.get(selected_index).copied().unwrap_or(1) + 2; // NOTE:
+                                                                                           // +2 is
+                                                                                           // borders
+    let viewport_height = scroll_handle.read().viewport_height().max(0) as usize;
+    let current_offset = scroll_handle.read().scroll_offset().max(0) as usize;
+    if viewport_height > 0 {
+        let selected_bottom = selected_top + selected_height;
+        let next_offset = if selected_top < current_offset {
+            selected_top
+        } else if selected_bottom > current_offset + viewport_height {
+            selected_bottom.saturating_sub(viewport_height)
+        } else {
+            current_offset
+        };
+        if next_offset != current_offset {
+            scroll_handle.write().scroll_to(next_offset as i32);
+        }
+    }
 
     hooks.use_local_terminal_events(move |event| match event {
         iocraft::TerminalEvent::Key(KeyEvent { code, kind, .. }) if kind == KeyEventKind::Press => {
@@ -58,7 +86,26 @@ pub fn UpdateRecordOfObject(
                     focused_field.set(Some(to_focus_field.get()));
                 }
                 KeyCode::Enter if focused_field.read().is_none() => {
-                    let new_record = fields_into_record(&old_record, &fields.read());
+                    let mut committed_fields = fields_for_submit.read().clone();
+                    let valid = committed_fields.iter_mut().all(|field| {
+                        let Some(initial_field) = field.value.field.as_ref() else {
+                            return false;
+                        };
+                        let Ok(new_field) =
+                            crate::ui4::forms::add_record_to_object::field_from_string(
+                                &field.draft,
+                                initial_field,
+                            )
+                        else {
+                            return false;
+                        };
+                        field.value.field = Some(new_field);
+                        true
+                    });
+                    if !valid {
+                        return;
+                    }
+                    let new_record = fields_into_record(&old_record, &committed_fields);
                     tokio::task::block_in_place(|| {
                         cmd_pipe.as_ref().and_then(|ch| {
                             Some(ch.blocking_send(QueryResultCmd::UpdateRecordOfObject(
@@ -77,22 +124,51 @@ pub fn UpdateRecordOfObject(
     element! {
         View(
             width: 100pct,
+            height: 100pct,
             flex_direction: iocraft::FlexDirection::Column,
             border_style: iocraft::components::BorderStyle::Round,
             border_color: Color::Yellow
         ) {
-            #(fields.read().iter().enumerate().map(|(index, field)| element! {
+            View (
+                justify_content: JustifyContent::Center
+            ){
+                Text(content: "Update record of object")
+            }
+            ScrollView(
+                handle: Some(scroll_handle),
+                scrollbar: Some(true),
+                keyboard_scroll: Some(false),
+            ) {
                 View(
-                    border_style: if to_focus_field.get() == index {
-                        iocraft::components::BorderStyle::Single
-                    } else { iocraft::components::BorderStyle::None }
+                    flex_direction: iocraft::FlexDirection::Column,
+                    width: 100pct,
                 ) {
-                    FormTextInput(
-                        has_focus: focused_field.read().as_ref() == Some(&index),
-                        field: field.clone(), fields: Some(fields), index,
-                    )
+                    #(fields.read().iter().enumerate().map(|(index, field)| element! {
+                        View(
+                            width: 100pct,
+                            height: 100pct,
+                            border_style: if to_focus_field.get() == index {
+                                iocraft::components::BorderStyle::Single
+                            } else {
+                                iocraft::components::BorderStyle::None
+                            },
+                            padding: if to_focus_field.get() == index {
+                                iocraft::Padding::Unset
+                            } else {
+                                iocraft::Padding::Length(1)
+                            },
+                        ) {
+                            FormTextInput(
+                                has_focus: focused_field.read().as_ref() == Some(&index),
+                                field: field.clone(),
+                                fields: Some(fields),
+                                heights: Some(field_heights),
+                                index,
+                            )
+                        }
+                    }))
                 }
-            }))
+            }
         }
     }
 }
@@ -102,21 +178,34 @@ struct FormTextInputProps {
     has_focus: bool,
     field: RecordField,
     fields: Option<State<Vec<RecordField>>>,
+    heights: Option<State<Vec<usize>>>,
     index: usize,
 }
 
 #[component]
-fn FormTextInput(props: &FormTextInputProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
+fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
     let Some(mut fields) = props.fields else {
+        return element! { View() };
+    };
+    let Some(mut heights) = props.heights else {
         return element! { View() };
     };
     let index = props.index;
     let value = fields
         .read()
         .get(index)
-        .and_then(|field| field.value.field.as_ref())
-        .map(crate::ui4::forms::add_record_to_object::field_into_string)
+        .map(|field| field.draft.clone())
         .unwrap_or_default();
+    if let Some(rect) = hooks.use_component_rect() {
+        let height = rect.bottom.saturating_sub(rect.top) as usize;
+        let mut next_heights = heights.read().clone();
+        if next_heights.get(index).copied() != Some(height) {
+            if let Some(current_height) = next_heights.get_mut(index) {
+                *current_height = height;
+                heights.set(next_heights);
+            }
+        }
+    }
 
     element! {
         View(width: 100pct) {
@@ -128,18 +217,17 @@ fn FormTextInput(props: &FormTextInputProps, _hooks: Hooks) -> impl Into<AnyElem
             }
             View(
                 background_color: if props.has_focus { Some(Color::DarkGrey) } else { None },
-                width: 90pct, height: 1,
+                width: 80pct,
             ) {
                 TextInput(
-                    has_focus: props.has_focus, value,
+                    has_focus: props.has_focus,
+                    value,
+                    multiline: true,
+                    auto_grow: true,
                     on_change: move |new_value| {
                         let mut next_fields = fields.read().clone();
                         let Some(field) = next_fields.get_mut(index) else { return; };
-                        let Some(initial_field) = field.value.field.as_ref() else { return; };
-                        let Ok(new_field) = crate::ui4::forms::add_record_to_object::field_from_string(
-                            &new_value, initial_field,
-                        ) else { return; };
-                        field.value.field = Some(new_field);
+                        field.draft = new_value;
                         fields.set(next_fields);
                     }
                 )
@@ -173,6 +261,11 @@ fn record_fields(record: &proto::common::DbRecord) -> Vec<RecordField> {
         .map(|(column, value)| RecordField {
             name: column.name.clone(),
             value: value.clone(),
+            draft: value
+                .field
+                .as_ref()
+                .map(crate::ui4::forms::add_record_to_object::field_into_string)
+                .unwrap_or_default(),
         })
         .collect()
 }
