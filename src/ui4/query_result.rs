@@ -269,51 +269,11 @@ pub fn QueryResult(
         View(
             width: 100pct,
             height: 100pct,
+            position: Position::Relative,
             justify_content: Some(AlignContent::Center),
             border_style: BorderStyle::Round,
             border_color: if tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult) { Color::Yellow } else { Color::Cyan },
         ) {
-            #(
-                match (render_popup.read().as_ref(), selected_object.read().as_ref()) {
-                    (Some(Popup::AddRecordToObject(true)), Some(obj)) => {
-                        element! {
-                            View(
-                                position: Position::Absolute,
-                                width: 70pct,
-                                height: 50pct,
-                                top: 8,
-                                left: 4,
-                            ) {
-                                AddRecordToObjectForm(
-                                    object: obj.clone(),
-                                    cmd_pipe: props.cmd_pipe.clone(),
-                                )
-                            }
-                        }
-                    },
-                    (Some(Popup::UpdateRecordOfObject(initial_record)), _) => {
-                        element! {
-                            View(
-                                position: Position::Absolute,
-                                width: 70pct,
-                                height: 50pct,
-                                top: 8,
-                                left: 4,
-                            ) {
-                                UpdateRecordOfObject(
-                                    initial_record: initial_record.clone(),
-                                    cmd_pipe: props.cmd_pipe.clone(),
-                                )
-                            }
-                        }
-                    }
-                    _ => {
-                        element! {
-                            View {}
-                        }
-                    }
-                }
-            )
             #(
                 match to_visualize.read().specification.as_ref() {
                     Some(proto::common::db_record::Specification::Postgres(postgres_record)) => {
@@ -384,6 +344,49 @@ pub fn QueryResult(
                                 Text(content: "Nothing to display")
                             }
                         },
+                }
+            )
+            #(
+                match (render_popup.read().as_ref(), selected_object.read().as_ref()) {
+                    (Some(Popup::AddRecordToObject(true)), Some(obj)) => {
+                        element! {
+                            View(
+                                position: Position::Absolute,
+                                width: 70pct,
+                                height: 50pct,
+                                top: 8,
+                                left: 4,
+                                background_color: Color::Black,
+                            ) {
+                                AddRecordToObjectForm(
+                                    object: obj.clone(),
+                                    cmd_pipe: props.cmd_pipe.clone(),
+                                )
+                            }
+                        }
+                    },
+                    (Some(Popup::UpdateRecordOfObject(initial_record)), _) => {
+                        element! {
+                            View(
+                                position: Position::Absolute,
+                                width: 70pct,
+                                height: 50pct,
+                                top: 8,
+                                left: 4,
+                                background_color: Color::Black,
+                            ) {
+                                UpdateRecordOfObject(
+                                    initial_record: initial_record.clone(),
+                                    cmd_pipe: props.cmd_pipe.clone(),
+                                )
+                            }
+                        }
+                    }
+                    _ => {
+                        element! {
+                            View {}
+                        }
+                    }
                 }
             )
         }

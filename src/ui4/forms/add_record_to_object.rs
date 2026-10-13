@@ -1,10 +1,10 @@
 use anyhow::anyhow;
 use iocraft::{
     component,
-    components::{Text, TextInput, View},
+    components::{ScrollView, ScrollViewHandle, Text, TextInput, View},
     element,
-    hooks::{State, UseState, UseTerminalEvents},
-    AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props,
+    hooks::{State, UseComponentRect, UseRef, UseState, UseTerminalEvents},
+    AnyElement, Color, Hooks, JustifyContent, KeyCode, KeyEvent, KeyEventKind, Props,
 };
 
 use crate::{core::proto, ui4::app_state::QueryResultCmd};
@@ -28,7 +28,47 @@ pub fn AddRecordToObjectForm(
     let renderable_fields =
         specification_into_renderable(fields.read().as_ref()).unwrap_or_default();
     let fields_count = renderable_fields.len();
+    let mut scroll_handle = hooks.use_ref_default::<ScrollViewHandle>();
+    let field_heights = hooks.use_state(|| vec![1usize; fields_count]);
+    let drafts = hooks.use_state(|| {
+        renderable_fields
+            .iter()
+            .map(|(_, field)| {
+                field
+                    .as_ref()
+                    .and_then(|field| field.field.as_ref())
+                    .map(field_into_string)
+                    .unwrap_or_default()
+            })
+            .collect::<Vec<_>>()
+    });
     let cmd_pipe = props.cmd_pipe.clone();
+    let fields_for_submit = fields.clone();
+    let drafts_for_submit = drafts.clone();
+
+    let selected_index = to_focus_field.get();
+    let field_heights_ref = field_heights.read();
+    let selected_top = (0..selected_index)
+        .map(|index| field_heights_ref.get(index).copied().unwrap_or(1) + 2) // NOTE: +2 is borders
+        .sum::<usize>();
+    let selected_height = field_heights_ref.get(selected_index).copied().unwrap_or(1) + 2; // NOTE:
+                                                                                           // +2 is
+                                                                                           // borders
+    let viewport_height = scroll_handle.read().viewport_height().max(0) as usize;
+    let current_offset = scroll_handle.read().scroll_offset().max(0) as usize;
+    if viewport_height > 0 {
+        let selected_bottom = selected_top + selected_height;
+        let next_offset = if selected_top < current_offset {
+            selected_top
+        } else if selected_bottom > current_offset + viewport_height {
+            selected_bottom.saturating_sub(viewport_height)
+        } else {
+            current_offset
+        };
+        if next_offset != current_offset {
+            scroll_handle.write().scroll_to(next_offset as i32);
+        }
+    }
 
     hooks.use_local_terminal_events(move |event| match event {
         iocraft::TerminalEvent::Key(KeyEvent { code, kind, .. })
@@ -60,7 +100,31 @@ pub fn AddRecordToObjectForm(
                     focused_field.set(Some(to_focus_field.get()));
                 }
                 KeyCode::Enter if focused_field.read().is_none() => {
-                    let record = fields.read().as_ref().and_then(specification_into_record);
+                    let mut specification = fields_for_submit.read().clone();
+                    let Some(mut specification) = specification.as_mut() else {
+                        return;
+                    };
+                    let drafts = drafts_for_submit.read();
+                    let valid = drafts.iter().enumerate().all(|(index, input)| {
+                        let Some(initial_field) = field_at(&specification, index) else {
+                            return false;
+                        };
+                        let Some(initial_field) = initial_field.field.as_ref() else {
+                            return false;
+                        };
+                        let Ok(value) = field_from_string(input, initial_field) else {
+                            return false;
+                        };
+                        let Some(field) = field_at_mut(&mut specification, index) else {
+                            return false;
+                        };
+                        field.field = Some(value);
+                        true
+                    });
+                    if !valid {
+                        return;
+                    }
+                    let record = specification_into_record(specification);
 
                     if let Some(record) = record {
                         tokio::task::block_in_place(|| {
@@ -79,24 +143,52 @@ pub fn AddRecordToObjectForm(
     element! {
         View(
             width: 100pct,
+            height: 100pct,
             flex_direction: iocraft::FlexDirection::Column,
             border_style: iocraft::components::BorderStyle::Round,
             border_color: Color::Yellow,
         ) {
-            #(
-                renderable_fields.iter().enumerate().map(|(i, f)| {
-                    element! {
-                        View (border_style: if to_focus_field.get() == i { iocraft::components::BorderStyle::Single } else { iocraft::components::BorderStyle::None }) {
-                            FormTextInput(
-                                has_focus: if let Some(ff) = focused_field.read().as_ref() { *ff == i } else { false },
-                                field_name: f.0.clone(),
-                                fields: Some(fields),
-                                index: i,
-                            )
-                        }
-                    }
-                })
-            )
+            View (
+                justify_content: JustifyContent::Center
+            ){
+                Text(content: "Add record to object")
+            }
+            ScrollView(
+                handle: Some(scroll_handle),
+                scrollbar: Some(true),
+                keyboard_scroll: Some(false),
+            ) {
+                View(flex_direction: iocraft::FlexDirection::Column, width: 100pct) {
+                    #(
+                        renderable_fields.iter().enumerate().map(|(i, f)| {
+                            element! {
+                                View(
+                                    width: 100pct,
+                                    height: 100pct,
+                                    border_style: if to_focus_field.get() == i {
+                                        iocraft::components::BorderStyle::Single
+                                    } else {
+                                        iocraft::components::BorderStyle::None
+                                    },
+                                    padding: if to_focus_field.get() == i {
+                                        iocraft::Padding::Unset
+                                    } else {
+                                        iocraft::Padding::Length(1)
+                                    },
+                                ) {
+                                    FormTextInput(
+                                        has_focus: if let Some(ff) = focused_field.read().as_ref() { *ff == i } else { false },
+                                        field_name: f.0.clone(),
+                                        drafts: Some(drafts),
+                                        heights: Some(field_heights),
+                                        index: i,
+                                    )
+                                }
+                            }
+                        })
+                    )
+                }
+            }
         }
     }
 }
@@ -105,27 +197,37 @@ pub fn AddRecordToObjectForm(
 struct FormTextInputProps {
     has_focus: bool,
     field_name: String,
-    fields: Option<State<Option<proto::common::db_object::Specification>>>,
+    drafts: Option<State<Vec<String>>>,
+    heights: Option<State<Vec<usize>>>,
     index: usize,
 }
 
 #[component]
-fn FormTextInput(props: &FormTextInputProps, _hooks: Hooks) -> impl Into<AnyElement<'static>> {
-    let Some(mut fields) = props.fields else {
-        panic!("fields is required");
+fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyElement<'static>> {
+    let Some(mut drafts) = props.drafts else {
+        panic!("drafts is required");
+    };
+    let Some(mut heights) = props.heights else {
+        panic!("heights is required");
     };
     let index = props.index;
-    let value = fields
-        .read()
-        .as_ref()
-        .and_then(|specification| field_at(specification, index))
-        .and_then(|field| field.field.as_ref())
-        .map(field_into_string)
-        .unwrap_or_default();
+    let value = drafts.read().get(index).cloned().unwrap_or_default();
+    if let Some(rect) = hooks.use_component_rect() {
+        let height = rect.bottom.saturating_sub(rect.top) as usize;
+        let mut next_heights = heights.read().clone();
+        if next_heights.get(index).copied() != Some(height) {
+            if let Some(current_height) = next_heights.get_mut(index) {
+                *current_height = height;
+                heights.set(next_heights);
+            }
+        }
+    }
 
     element! {
         View (width: 100pct) {
-            View(margin_right: 1) {
+            View(
+                margin_right: 1,
+            ) {
                 Text(
                     content: props.field_name.clone(),
                     color: Color::Blue
@@ -133,25 +235,18 @@ fn FormTextInput(props: &FormTextInputProps, _hooks: Hooks) -> impl Into<AnyElem
             }
             View(
                 background_color: if props.has_focus { Some(Color::DarkGrey) } else { None },
-                width: 90pct,
-                height: 1,
+                width: 80pct,
             ) {
                 TextInput(
                     has_focus: props.has_focus,
                     value,
+                    multiline: true,
+                    auto_grow: true,
                     on_change: move |new_value| {
-                        let mut next_specification = fields.read().clone();
-
-                        if let Some(field) = next_specification
-                            .as_mut()
-                            .and_then(|specification| field_at_mut(specification, index))
-                        {
-                            if let Some(initial_field) = &field.field {
-                                if let Ok(mapped_field) = field_from_string(&new_value, initial_field) {
-                                    field.field = Some(mapped_field);
-                                    fields.set(next_specification);
-                                }
-                            }
+                        let mut next_drafts = drafts.read().clone();
+                        if let Some(draft) = next_drafts.get_mut(index) {
+                            *draft = new_value;
+                            drafts.set(next_drafts);
                         }
                     }
                 )
