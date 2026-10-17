@@ -115,10 +115,11 @@ pub fn AddRecordToObjectForm(
                         let Ok(value) = field_from_string(input, initial_field) else {
                             return false;
                         };
-                        let Some(field) = field_at_mut(&mut specification, index) else {
+                        let Some(field) = field_at_mut_postgres(&mut specification, index) else {
                             return false;
                         };
-                        field.field = Some(value);
+                        let proto::common::db_field::Field::Postgres(value) = value;
+                        field.field = value.field;
                         true
                     });
                     if !valid {
@@ -257,26 +258,33 @@ fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyE
 
 pub fn field_into_string(input: &proto::common::db_field::Field) -> String {
     match input {
-        proto::common::db_field::Field::Str(s) => {
-            s.str.as_ref().map_or(String::default(), |v| v.to_string())
-        }
-        proto::common::db_field::Field::StrContainer(sc) => sc.strs.join("\n"),
-        proto::common::db_field::Field::I8(i) => i.i8.map_or(String::default(), |v| v.to_string()),
-        proto::common::db_field::Field::I16(i) => {
-            i.i16.map_or(String::default(), |v| v.to_string())
-        }
-        proto::common::db_field::Field::I32(i) => {
-            i.i32.map_or(String::default(), |v| v.to_string())
-        }
-        proto::common::db_field::Field::I64(i) => {
-            i.i64.map_or(String::default(), |v| v.to_string())
-        }
-        proto::common::db_field::Field::Boolean(b) => {
-            b.boolean.map_or(String::default(), |v| v.to_string())
-        }
-        proto::common::db_field::Field::Datetime(timestamp) => timestamp
-            .datetime
-            .map_or(String::default(), |v| v.to_string()),
+        proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
+            field: Some(field),
+        }) => match field {
+            proto::postgresql::db_field::Field::Str(s) => {
+                s.str.as_ref().map_or(String::default(), |v| v.to_string())
+            }
+            proto::postgresql::db_field::Field::StrContainer(sc) => sc.strs.join("\n"),
+            proto::postgresql::db_field::Field::I8(i) => {
+                i.i8.map_or(String::default(), |v| v.to_string())
+            }
+            proto::postgresql::db_field::Field::I16(i) => {
+                i.i16.map_or(String::default(), |v| v.to_string())
+            }
+            proto::postgresql::db_field::Field::I32(i) => {
+                i.i32.map_or(String::default(), |v| v.to_string())
+            }
+            proto::postgresql::db_field::Field::I64(i) => {
+                i.i64.map_or(String::default(), |v| v.to_string())
+            }
+            proto::postgresql::db_field::Field::Boolean(b) => {
+                b.boolean.map_or(String::default(), |v| v.to_string())
+            }
+            proto::postgresql::db_field::Field::Datetime(timestamp) => timestamp
+                .datetime
+                .map_or(String::default(), |v| v.to_string()),
+        },
+        _ => String::default(),
     }
 }
 
@@ -285,84 +293,145 @@ pub fn field_from_string(
     initial_field: &proto::common::db_field::Field,
 ) -> anyhow::Result<proto::common::db_field::Field> {
     match initial_field {
-        proto::common::db_field::Field::Str(_) => {
-            Ok(proto::common::db_field::Field::Str(proto::common::String {
-                str: if input.is_empty() {
-                    None
-                } else {
-                    Some(input.clone())
-                },
-            }))
-        }
-        proto::common::db_field::Field::StrContainer(_) => {
-            let splitted: Vec<String> = input.split('\n').map(|s| s.to_string()).collect();
-            Ok(proto::common::db_field::Field::StrContainer(
-                proto::common::StringContainer { strs: splitted },
-            ))
-        }
-        proto::common::db_field::Field::I8(_) => {
-            if input.is_empty() {
-                return Ok(proto::common::db_field::Field::I8(proto::common::Int8 {
-                    i8: None,
-                }));
+        proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
+            field: Some(field),
+        }) => match field {
+            proto::postgresql::db_field::Field::Str(_) => Ok(
+                proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
+                    field: Some(proto::postgresql::db_field::Field::Str(
+                        proto::postgresql::String {
+                            str: if input.is_empty() {
+                                None
+                            } else {
+                                Some(input.clone())
+                            },
+                        },
+                    )),
+                }),
+            ),
+            proto::postgresql::db_field::Field::StrContainer(_) => {
+                let splitted: Vec<String> = input.split('\n').map(|s| s.to_string()).collect();
+                Ok(proto::common::db_field::Field::Postgres(
+                    proto::postgresql::DbField {
+                        field: Some(proto::postgresql::db_field::Field::StrContainer(
+                            proto::postgresql::StringContainer { strs: splitted },
+                        )),
+                    },
+                ))
             }
-            let i = i8::from_str_radix(&input, 10)?;
-            Ok(proto::common::db_field::Field::I8(proto::common::Int8 {
-                i8: Some(i as i32),
-            }))
-        }
-        proto::common::db_field::Field::I16(_) => {
-            if input.is_empty() {
-                return Ok(proto::common::db_field::Field::I16(proto::common::Int16 {
-                    i16: None,
-                }));
+            proto::postgresql::db_field::Field::I8(_) => {
+                if input.is_empty() {
+                    return Ok(proto::common::db_field::Field::Postgres(
+                        proto::postgresql::DbField {
+                            field: Some(proto::postgresql::db_field::Field::I8(
+                                proto::postgresql::Int8 { i8: None },
+                            )),
+                        },
+                    ));
+                }
+                let i = i8::from_str_radix(&input, 10)?;
+                Ok(proto::common::db_field::Field::Postgres(
+                    proto::postgresql::DbField {
+                        field: Some(proto::postgresql::db_field::Field::I8(
+                            proto::postgresql::Int8 { i8: Some(i as i32) },
+                        )),
+                    },
+                ))
             }
-            let i = i16::from_str_radix(&input, 10)?;
-            Ok(proto::common::db_field::Field::I16(proto::common::Int16 {
-                i16: Some(i as i32),
-            }))
-        }
-        proto::common::db_field::Field::I32(_) => {
-            if input.is_empty() {
-                return Ok(proto::common::db_field::Field::I32(proto::common::Int32 {
-                    i32: None,
-                }));
+            proto::postgresql::db_field::Field::I16(_) => {
+                if input.is_empty() {
+                    return Ok(proto::common::db_field::Field::Postgres(
+                        proto::postgresql::DbField {
+                            field: Some(proto::postgresql::db_field::Field::I16(
+                                proto::postgresql::Int16 { i16: None },
+                            )),
+                        },
+                    ));
+                }
+                let i = i16::from_str_radix(&input, 10)?;
+                Ok(proto::common::db_field::Field::Postgres(
+                    proto::postgresql::DbField {
+                        field: Some(proto::postgresql::db_field::Field::I16(
+                            proto::postgresql::Int16 {
+                                i16: Some(i as i32),
+                            },
+                        )),
+                    },
+                ))
             }
-            let i = i32::from_str_radix(&input, 10)?;
-            Ok(proto::common::db_field::Field::I32(proto::common::Int32 {
-                i32: Some(i),
-            }))
-        }
-        proto::common::db_field::Field::I64(_) => {
-            if input.is_empty() {
-                return Ok(proto::common::db_field::Field::I64(proto::common::Int64 {
-                    i64: None,
-                }));
+            proto::postgresql::db_field::Field::I32(_) => {
+                if input.is_empty() {
+                    return Ok(proto::common::db_field::Field::Postgres(
+                        proto::postgresql::DbField {
+                            field: Some(proto::postgresql::db_field::Field::I32(
+                                proto::postgresql::Int32 { i32: None },
+                            )),
+                        },
+                    ));
+                }
+                let i = i32::from_str_radix(&input, 10)?;
+                Ok(proto::common::db_field::Field::Postgres(
+                    proto::postgresql::DbField {
+                        field: Some(proto::postgresql::db_field::Field::I32(
+                            proto::postgresql::Int32 { i32: Some(i) },
+                        )),
+                    },
+                ))
             }
-            let i = i64::from_str_radix(&input, 10)?;
-            Ok(proto::common::db_field::Field::I64(proto::common::Int64 {
-                i64: Some(i),
-            }))
-        }
-        proto::common::db_field::Field::Boolean(_) => match input.as_str() {
-            "true" | "1" => Ok(proto::common::db_field::Field::Boolean(
-                proto::common::Boolean {
-                    boolean: Some(true),
-                },
-            )),
-            "false" | "0" => Ok(proto::common::db_field::Field::Boolean(
-                proto::common::Boolean {
-                    boolean: Some(false),
-                },
-            )),
-            "" => Ok(proto::common::db_field::Field::Boolean(
-                proto::common::Boolean { boolean: None },
-            )),
-            _ => Err(anyhow!("cannot be mapped into boolean")),
+            proto::postgresql::db_field::Field::I64(_) => {
+                if input.is_empty() {
+                    return Ok(proto::common::db_field::Field::Postgres(
+                        proto::postgresql::DbField {
+                            field: Some(proto::postgresql::db_field::Field::I64(
+                                proto::postgresql::Int64 { i64: None },
+                            )),
+                        },
+                    ));
+                }
+                let i = i64::from_str_radix(&input, 10)?;
+                Ok(proto::common::db_field::Field::Postgres(
+                    proto::postgresql::DbField {
+                        field: Some(proto::postgresql::db_field::Field::I64(
+                            proto::postgresql::Int64 { i64: Some(i) },
+                        )),
+                    },
+                ))
+            }
+            proto::postgresql::db_field::Field::Boolean(_) => match input.as_str() {
+                "true" | "1" => Ok(proto::common::db_field::Field::Postgres(
+                    proto::postgresql::DbField {
+                        field: Some(proto::postgresql::db_field::Field::Boolean(
+                            proto::postgresql::Boolean {
+                                boolean: Some(true),
+                            },
+                        )),
+                    },
+                )),
+                "false" | "0" => Ok(proto::common::db_field::Field::Postgres(
+                    proto::postgresql::DbField {
+                        field: Some(proto::postgresql::db_field::Field::Boolean(
+                            proto::postgresql::Boolean {
+                                boolean: Some(false),
+                            },
+                        )),
+                    },
+                )),
+                "" => Ok(proto::common::db_field::Field::Postgres(
+                    proto::postgresql::DbField {
+                        field: Some(proto::postgresql::db_field::Field::Boolean(
+                            proto::postgresql::Boolean { boolean: None },
+                        )),
+                    },
+                )),
+                _ => Err(anyhow!("cannot be mapped into boolean")),
+            },
+            proto::postgresql::db_field::Field::Datetime(timestamp) => {
+                todo!("timestamp mapping")
+            }
         },
-        proto::common::db_field::Field::Datetime(_) => {
-            todo!()
-        }
+        proto::common::db_field::Field::Postgres(proto::postgresql::DbField { field: None }) => Ok(
+            proto::common::db_field::Field::Postgres(proto::postgresql::DbField { field: None }),
+        ),
     }
 }
 
@@ -373,17 +442,17 @@ fn specification_into_record(
         return None;
     };
 
-    let proto::common::postgres_object::Object::Table(table) = postgres.object.as_ref()? else {
+    let proto::postgresql::postgres_object::Object::Table(table) = postgres.object.as_ref()? else {
         return None;
     };
 
     Some(proto::common::DbRecord {
         specification: Some(proto::common::db_record::Specification::Postgres(
-            proto::common::PostgresRecord {
-                record: Some(proto::common::postgres_record::Record::Table(
-                    proto::common::PostgresRecordTable {
+            proto::postgresql::PostgresRecord {
+                record: Some(proto::postgresql::postgres_record::Record::Table(
+                    proto::postgresql::PostgresRecordTable {
                         columns: table.columns.clone(),
-                        rows: vec![proto::common::PostgresRecordTableRow {
+                        rows: vec![proto::postgresql::PostgresRecordTableRow {
                             values: table
                                 .columns
                                 .iter()
@@ -404,16 +473,23 @@ fn specification_into_renderable(
     match specification {
         proto::common::db_object::Specification::Postgres(postgres) => {
             match postgres.object.as_ref()? {
-                proto::common::postgres_object::Object::Table(table) => Some(
+                proto::postgresql::postgres_object::Object::Table(table) => Some(
                     table
                         .columns
                         .iter()
-                        .map(|column| (column.name.clone(), column.field.clone()))
+                        .map(|column| {
+                            (
+                                column.name.clone(),
+                                column.field.clone().map(|f| proto::common::DbField {
+                                    field: Some(proto::common::db_field::Field::Postgres(f)),
+                                }),
+                            )
+                        })
                         .collect(),
                 ),
                 // A record can be added only to a table, not to a database or schema.
-                proto::common::postgres_object::Object::Database(_)
-                | proto::common::postgres_object::Object::Schema(_) => None,
+                proto::postgresql::postgres_object::Object::Database(_)
+                | proto::postgresql::postgres_object::Object::Schema(_) => None,
             }
         }
         // Redis objects are not implemented yet.
@@ -424,35 +500,38 @@ fn specification_into_renderable(
 fn field_at(
     specification: &proto::common::db_object::Specification,
     index: usize,
-) -> Option<&proto::common::DbField> {
+) -> Option<proto::common::DbField> {
     match specification {
         proto::common::db_object::Specification::Postgres(postgres) => {
             match postgres.object.as_ref()? {
-                proto::common::postgres_object::Object::Table(table) => table
-                    .columns
-                    .get(index)
-                    .and_then(|column| column.field.as_ref()),
-                proto::common::postgres_object::Object::Database(_)
-                | proto::common::postgres_object::Object::Schema(_) => None,
+                proto::postgresql::postgres_object::Object::Table(table) => {
+                    table.columns.get(index).and_then(|column| {
+                        column.field.clone().map(|f| proto::common::DbField {
+                            field: Some(proto::common::db_field::Field::Postgres(f)),
+                        })
+                    })
+                }
+                proto::postgresql::postgres_object::Object::Database(_)
+                | proto::postgresql::postgres_object::Object::Schema(_) => None,
             }
         }
         proto::common::db_object::Specification::Redis(_) => None,
     }
 }
 
-fn field_at_mut(
+fn field_at_mut_postgres(
     specification: &mut proto::common::db_object::Specification,
     index: usize,
-) -> Option<&mut proto::common::DbField> {
+) -> Option<&mut proto::postgresql::DbField> {
     match specification {
         proto::common::db_object::Specification::Postgres(postgres) => {
             match postgres.object.as_mut()? {
-                proto::common::postgres_object::Object::Table(table) => table
+                proto::postgresql::postgres_object::Object::Table(table) => table
                     .columns
                     .get_mut(index)
                     .and_then(|column| column.field.as_mut()),
-                proto::common::postgres_object::Object::Database(_)
-                | proto::common::postgres_object::Object::Schema(_) => None,
+                proto::postgresql::postgres_object::Object::Database(_)
+                | proto::postgresql::postgres_object::Object::Schema(_) => None,
             }
         }
         proto::common::db_object::Specification::Redis(_) => None,

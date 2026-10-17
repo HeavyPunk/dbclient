@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use crate::{
     core::proto::{
         self,
-        common::{self, db_object::Specification, postgres_object::Object},
+        common::{self, db_object::Specification},
     },
     ui4::{
         app_state::{AppState, Page, QueryResultCmd, Widget},
@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-type DbFileTreeNode = FileTreeNode<common::PostgresObjectDescriptor>;
+type DbFileTreeNode = FileTreeNode<proto::postgresql::PostgresObjectDescriptor>;
 
 #[derive(Default, Props)]
 pub struct DbObjectsProps {
@@ -47,7 +47,7 @@ fn specification_node(
             DbFileTreeNode::new(format!("Redis: {}", redis.name), vec![])
         }
         Specification::Postgres(postgres) => match postgres.object {
-            Some(Object::Database(database)) => {
+            Some(proto::postgresql::postgres_object::Object::Database(database)) => {
                 let mut node = DbFileTreeNode::new(
                     format!("⛁ {}", name(database.descriptor.as_ref(), |d| &d.name)),
                     database
@@ -55,8 +55,10 @@ fn specification_node(
                         .into_iter()
                         .map(|schema| {
                             specification_node(
-                                Specification::Postgres(proto::common::PostgresObject {
-                                    object: Some(Object::Schema(schema)),
+                                Specification::Postgres(proto::postgresql::PostgresObject {
+                                    object: Some(
+                                        proto::postgresql::postgres_object::Object::Schema(schema),
+                                    ),
                                 }),
                                 state.clone(),
                                 cmd_pipe.clone(),
@@ -65,23 +67,27 @@ fn specification_node(
                         .collect(),
                 );
                 if let Some(descriptor) = database.descriptor {
-                    node = node.with_context(common::PostgresObjectDescriptor {
-                        descriptor: Some(common::postgres_object_descriptor::Descriptor::Database(
-                            descriptor,
-                        )),
+                    node = node.with_context(proto::postgresql::PostgresObjectDescriptor {
+                        descriptor: Some(
+                            proto::postgresql::postgres_object_descriptor::Descriptor::Database(
+                                descriptor,
+                            ),
+                        ),
                     });
                 }
                 node
             }
-            Some(Object::Schema(schema)) => {
+            Some(proto::postgresql::postgres_object::Object::Schema(schema)) => {
                 let schema_descriptor = schema.descriptor.clone();
                 let tables = schema
                     .tables
                     .into_iter()
                     .map(|table| {
                         specification_node(
-                            Specification::Postgres(proto::common::PostgresObject {
-                                object: Some(Object::Table(table)),
+                            Specification::Postgres(proto::postgresql::PostgresObject {
+                                object: Some(proto::postgresql::postgres_object::Object::Table(
+                                    table,
+                                )),
                             }),
                             state.clone(),
                             cmd_pipe.clone(),
@@ -119,15 +125,17 @@ fn specification_node(
                     children,
                 );
                 if let Some(descriptor) = schema_descriptor {
-                    node = node.with_context(common::PostgresObjectDescriptor {
-                        descriptor: Some(common::postgres_object_descriptor::Descriptor::Schema(
-                            descriptor,
-                        )),
+                    node = node.with_context(proto::postgresql::PostgresObjectDescriptor {
+                        descriptor: Some(
+                            proto::postgresql::postgres_object_descriptor::Descriptor::Schema(
+                                descriptor,
+                            ),
+                        ),
                     });
                 }
                 node
             }
-            Some(Object::Table(table)) => {
+            Some(proto::postgresql::postgres_object::Object::Table(table)) => {
                 let table_descriptor = table.descriptor.clone();
                 let columns = table
                     .columns
@@ -160,9 +168,11 @@ fn specification_node(
                 );
                 if let Some(descriptor) = table_descriptor {
                     node = node
-                        .with_context(common::PostgresObjectDescriptor {
+                        .with_context(proto::postgresql::PostgresObjectDescriptor {
                             descriptor: Some(
-                                common::postgres_object_descriptor::Descriptor::Table(descriptor),
+                                proto::postgresql::postgres_object_descriptor::Descriptor::Table(
+                                    descriptor,
+                                ),
                             ),
                         })
                         .on_enter(move |ctx| {
@@ -277,7 +287,7 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
 
     element! {
         View(width: 100pct, height: 100pct, border_style: BorderStyle::Round, border_color: if focus.get() { Color::Yellow } else { Color::Cyan }) {
-            FileTree::<common::PostgresObjectDescriptor>(
+            FileTree::<proto::postgresql::PostgresObjectDescriptor>(
                 nodes: nodes,
                 selected_path: selected_path.read().clone(),
                 has_focus: has_focus.get(),

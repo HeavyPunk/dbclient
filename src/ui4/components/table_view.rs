@@ -8,7 +8,10 @@ use iocraft::{
     AnyElement, Color, Edges, FlexDirection, Hooks, KeyCode, KeyEventKind, KeyModifiers, Props,
 };
 
-use crate::{core::proto::common::db_field::Field, ui4::control::UseHotkeys};
+use crate::{
+    core::proto::{self, common::db_field::Field},
+    ui4::control::UseHotkeys,
+};
 
 pub type TableEventHandler = Arc<Mutex<Box<dyn FnMut(Vec<String>, Vec<Field>) + Send>>>;
 pub fn table_event_handler<F>(callback: F) -> TableEventHandler
@@ -30,25 +33,34 @@ pub struct TableViewProps {
 
 fn field_to_string(field: &Field) -> String {
     match field {
-        Field::Boolean(value) => value
-            .boolean
-            .map_or_else(String::new, |value| value.to_string()),
-        Field::Str(value) => value.str.clone().unwrap_or_default(),
-        Field::StrContainer(value) => value.strs.join(", "),
-        Field::I8(value) => value.i8.map_or_else(String::new, |value| value.to_string()),
-        Field::I16(value) => value
-            .i16
-            .map_or_else(String::new, |value| value.to_string()),
-        Field::I32(value) => value
-            .i32
-            .map_or_else(String::new, |value| value.to_string()),
-        Field::I64(value) => value
-            .i64
-            .map_or_else(String::new, |value| value.to_string()),
-        Field::Datetime(value) => value
-            .datetime
-            .as_ref()
-            .map_or_else(String::new, |value| format!("{value:?}")),
+        Field::Postgres(proto::postgresql::DbField { field }) => match field {
+            Some(field) => match field {
+                proto::postgresql::db_field::Field::Str(value) => {
+                    value.str.clone().unwrap_or_default()
+                }
+                proto::postgresql::db_field::Field::StrContainer(value) => value.strs.join("\n"),
+                proto::postgresql::db_field::Field::I8(value) => {
+                    value.i8.map_or_else(String::new, |value| value.to_string())
+                }
+                proto::postgresql::db_field::Field::I16(value) => value
+                    .i16
+                    .map_or_else(String::default, |value| value.to_string()),
+                proto::postgresql::db_field::Field::I32(value) => value
+                    .i32
+                    .map_or_else(String::default, |value| value.to_string()),
+                proto::postgresql::db_field::Field::I64(value) => value
+                    .i64
+                    .map_or_else(String::default, |value| value.to_string()),
+                proto::postgresql::db_field::Field::Boolean(value) => value
+                    .boolean
+                    .map_or_else(String::default, |value| value.to_string()),
+                proto::postgresql::db_field::Field::Datetime(value) => value
+                    .datetime
+                    .as_ref()
+                    .map_or_else(String::default, |value| format!("{value:?}")),
+            },
+            None => String::default(),
+        },
     }
 }
 
