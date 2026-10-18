@@ -14,43 +14,10 @@ pub mod proto {
     pub mod common {
         include!(concat!(env!("OUT_DIR"), "/dbclient.common.rs"));
     }
+    pub mod postgresql {
+        include!(concat!(env!("OUT_DIR"), "/dbclient.postgresql.rs"));
+    }
+    pub mod redis {
+        include!(concat!(env!("OUT_DIR"), "/dbclient.redis.rs"));
+    }
 }
-
-// enum CommandError {
-//
-// }
-//
-// trait Command {
-//     fn connections() -> impl Connections;
-//     fn objects() -> impl Objects;
-//     fn queries() -> impl Queries;
-// }
-//
-// trait Connections {
-//     fn get_available_list() -> Result<Vec<Connection>, CommandError>;
-// }
-//
-// struct Connection {
-//     id: String
-// }
-//
-// trait Objects {
-//     fn get_objects_of_connection(conn: &Connection) -> Result<Vec<DbObject>, CommandError>;
-//     fn add_object_to_connection(conn: &Connection, obj: DbObject) -> Result<(), CommandError>;
-// }
-//
-// struct DbObject {
-//
-// }
-//
-// trait Queries {
-//     fn execute_query(q: &Query) -> Result<QueryResult, CommandError>;
-// }
-//
-// struct Query {
-//
-// }
-//
-// struct QueryResult {
-//
-// }

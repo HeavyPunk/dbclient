@@ -8,6 +8,8 @@ fn main() {
                 "src/core/proto/dbclient/objects.proto",
                 "src/core/proto/dbclient/queries.proto",
                 "src/core/proto/dbclient/common.proto",
+                "src/core/proto/dbclient/postgresql.proto",
+                "src/core/proto/dbclient/redis.proto",
             ],
             &["src/core/proto/dbclient"],
         )

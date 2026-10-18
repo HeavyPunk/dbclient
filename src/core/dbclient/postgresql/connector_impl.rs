@@ -11,7 +11,7 @@ use crate::core::{
     },
     proto::{
         self,
-        common::{DbField, PostgresObjectDescriptor, PostgresRecord, PostgresTableDescriptor},
+        postgresql::{PostgresObjectDescriptor, PostgresRecord, PostgresTableDescriptor},
     },
 };
 
@@ -23,17 +23,27 @@ pub struct PostgresConnector {
     pub config: PostgresConfig,
 }
 
-impl proto::common::DbField {
+impl proto::postgresql::DbField {
     fn from_pg_type(type_name: &str) -> Self {
-        use proto::common::db_field::Field;
-
         let field = match type_name {
-            "bool" => Some(Field::Boolean(proto::common::Boolean { boolean: None })),
-            "int2" => Some(Field::I16(proto::common::Int16 { i16: None })),
-            "int4" => Some(Field::I32(proto::common::Int32 { i32: None })),
-            "int8" => Some(Field::I64(proto::common::Int64 { i64: None })),
-            "varchar" | "text" => Some(Field::Str(proto::common::String { str: None })),
-            "timestamptz" => Some(Field::Datetime(proto::common::Timestamp { datetime: None })),
+            "bool" => Some(proto::postgresql::db_field::Field::Boolean(
+                proto::postgresql::Boolean { boolean: None },
+            )),
+            "int2" => Some(proto::postgresql::db_field::Field::I16(
+                proto::postgresql::Int16 { i16: None },
+            )),
+            "int4" => Some(proto::postgresql::db_field::Field::I32(
+                proto::postgresql::Int32 { i32: None },
+            )),
+            "int8" => Some(proto::postgresql::db_field::Field::I64(
+                proto::postgresql::Int64 { i64: None },
+            )),
+            "varchar" | "text" => Some(proto::postgresql::db_field::Field::Str(
+                proto::postgresql::String { str: None },
+            )),
+            "timestamptz" => Some(proto::postgresql::db_field::Field::Datetime(
+                proto::postgresql::Timestamp { datetime: None },
+            )),
             _ => None,
         };
 
@@ -41,22 +51,32 @@ impl proto::common::DbField {
     }
 
     fn into_sql_value(&self) -> Option<String> {
-        use proto::common::db_field::Field;
-
         match &self.field {
-            Some(Field::Str(proto::common::String { str: Some(s) })) => Some(format!("'{s}'")),
-            Some(Field::StrContainer(proto::common::StringContainer { strs })) => {
+            Some(proto::postgresql::db_field::Field::Str(proto::postgresql::String {
+                str: Some(s),
+            })) => Some(format!("'{s}'")),
+            Some(proto::postgresql::db_field::Field::StrContainer(
+                proto::postgresql::StringContainer { strs },
+            )) => {
                 let s = strs.join("\n");
                 Some(format!("'{s}'"))
             }
-            Some(Field::I8(proto::common::Int8 { i8: Some(i8) })) => Some(i8.to_string()),
-            Some(Field::I16(proto::common::Int16 { i16: Some(i16) })) => Some(i16.to_string()),
-            Some(Field::I32(proto::common::Int32 { i32: Some(i32) })) => Some(i32.to_string()),
-            Some(Field::I64(proto::common::Int64 { i64: Some(i64) })) => Some(i64.to_string()),
-            Some(Field::Boolean(proto::common::Boolean { boolean: Some(b) })) => {
-                Some(b.to_string())
-            }
-            Some(Field::Datetime(proto::common::Timestamp {
+            Some(proto::postgresql::db_field::Field::I8(proto::postgresql::Int8 {
+                i8: Some(i8),
+            })) => Some(i8.to_string()),
+            Some(proto::postgresql::db_field::Field::I16(proto::postgresql::Int16 {
+                i16: Some(i16),
+            })) => Some(i16.to_string()),
+            Some(proto::postgresql::db_field::Field::I32(proto::postgresql::Int32 {
+                i32: Some(i32),
+            })) => Some(i32.to_string()),
+            Some(proto::postgresql::db_field::Field::I64(proto::postgresql::Int64 {
+                i64: Some(i64),
+            })) => Some(i64.to_string()),
+            Some(proto::postgresql::db_field::Field::Boolean(proto::postgresql::Boolean {
+                boolean: Some(b),
+            })) => Some(b.to_string()),
+            Some(proto::postgresql::db_field::Field::Datetime(proto::postgresql::Timestamp {
                 datetime: Some(timestamp),
             })) => {
                 let s = timestamp.to_string();
@@ -237,12 +257,12 @@ impl Connector for PostgresConnector {
                     .into_iter()
                     .map(|table_name| {
                         let key = (schema_name.clone(), table_name.clone());
-                        proto::common::PostgresTable {
-                            descriptor: Some(proto::common::PostgresTableDescriptor {
+                        proto::postgresql::PostgresTable {
+                            descriptor: Some(proto::postgresql::PostgresTableDescriptor {
                                 upstream_descriptor: Some(
-                                    proto::common::PostgresSchemaDescriptor {
+                                    proto::postgresql::PostgresSchemaDescriptor {
                                         upstream_descriptor: Some(
-                                            proto::common::PostgresDatabaseDescriptor {
+                                            proto::postgresql::PostgresDatabaseDescriptor {
                                                 name: database_name.clone(),
                                             },
                                         ),
@@ -255,30 +275,32 @@ impl Connector for PostgresConnector {
                                 .remove(&key)
                                 .unwrap_or_default()
                                 .into_iter()
-                                .map(|(name, type_name)| proto::common::PostgresTableColumn {
+                                .map(|(name, type_name)| proto::postgresql::PostgresTableColumn {
                                     name,
-                                    field: Some(DbField::from_pg_type(type_name.as_str())),
+                                    field: Some(proto::postgresql::DbField::from_pg_type(
+                                        type_name.as_str(),
+                                    )),
                                 })
                                 .collect(),
                             constrains: table_constraints
                                 .remove(&key)
                                 .unwrap_or_default()
                                 .into_iter()
-                                .map(|name| proto::common::PostgresTableConstrain { name })
+                                .map(|name| proto::postgresql::PostgresTableConstrain { name })
                                 .collect(),
                             indexes: table_indexes
                                 .remove(&key)
                                 .unwrap_or_default()
                                 .into_iter()
-                                .map(|name| proto::common::PostgresTableIndex { name })
+                                .map(|name| proto::postgresql::PostgresTableIndex { name })
                                 .collect(),
                         }
                     })
                     .collect();
 
-                proto::common::PostgresSchema {
-                    descriptor: Some(proto::common::PostgresSchemaDescriptor {
-                        upstream_descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+                proto::postgresql::PostgresSchema {
+                    descriptor: Some(proto::postgresql::PostgresSchemaDescriptor {
+                        upstream_descriptor: Some(proto::postgresql::PostgresDatabaseDescriptor {
                             name: database_name.clone(),
                         }),
                         name: schema_name.clone(),
@@ -288,19 +310,19 @@ impl Connector for PostgresConnector {
                         .remove(&schema_name)
                         .unwrap_or_default()
                         .into_iter()
-                        .map(|name| proto::common::PostgresView { name })
+                        .map(|name| proto::postgresql::PostgresView { name })
                         .collect(),
                     materialized_views: materialized_view_names
                         .remove(&schema_name)
                         .unwrap_or_default()
                         .into_iter()
-                        .map(|name| proto::common::PostgresView { name })
+                        .map(|name| proto::postgresql::PostgresView { name })
                         .collect(),
                     functions: function_names
                         .remove(&schema_name)
                         .unwrap_or_default()
                         .into_iter()
-                        .map(|name| proto::common::PostgresFunction { name })
+                        .map(|name| proto::postgresql::PostgresFunction { name })
                         .collect(),
                 }
             })
@@ -308,10 +330,10 @@ impl Connector for PostgresConnector {
 
         Ok(proto::common::DbObject {
             specification: Some(proto::common::db_object::Specification::Postgres(
-                proto::common::PostgresObject {
-                    object: Some(proto::common::postgres_object::Object::Database(
-                        proto::common::PostgresDatabase {
-                            descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+                proto::postgresql::PostgresObject {
+                    object: Some(proto::postgresql::postgres_object::Object::Database(
+                        proto::postgresql::PostgresDatabase {
+                            descriptor: Some(proto::postgresql::PostgresDatabaseDescriptor {
                                 name: database_name,
                             }),
                             schemas,
@@ -351,7 +373,7 @@ impl Connector for PostgresConnector {
         });
 
         let object = match descriptor {
-            proto::common::postgres_object_descriptor::Descriptor::Database(descriptor) => {
+            proto::postgresql::postgres_object_descriptor::Descriptor::Database(descriptor) => {
                 let current_database: String = client
                     .query_one("SELECT current_database()", &[])
                     .await?
@@ -366,7 +388,7 @@ impl Connector for PostgresConnector {
 
                 load_database_object(&client, current_database).await?
             }
-            proto::common::postgres_object_descriptor::Descriptor::Schema(descriptor) => {
+            proto::postgresql::postgres_object_descriptor::Descriptor::Schema(descriptor) => {
                 let database = descriptor.upstream_descriptor.as_ref().ok_or(
                     crate::core::dbclient::connector::ConnectorError::InvalidRequest(
                         "schema database descriptor is required",
@@ -387,13 +409,15 @@ impl Connector for PostgresConnector {
                     load_schema_object(&client, database.name.clone(), descriptor.name).await?;
                 proto::common::DbObject {
                     specification: Some(proto::common::db_object::Specification::Postgres(
-                        proto::common::PostgresObject {
-                            object: Some(proto::common::postgres_object::Object::Schema(object)),
+                        proto::postgresql::PostgresObject {
+                            object: Some(proto::postgresql::postgres_object::Object::Schema(
+                                object,
+                            )),
                         },
                     )),
                 }
             }
-            proto::common::postgres_object_descriptor::Descriptor::Table(descriptor) => {
+            proto::postgresql::postgres_object_descriptor::Descriptor::Table(descriptor) => {
                 let schema = descriptor.upstream_descriptor.ok_or(
                     crate::core::dbclient::connector::ConnectorError::InvalidRequest(
                         "table schema descriptor is required",
@@ -419,8 +443,8 @@ impl Connector for PostgresConnector {
                     load_table_object(&client, database.name, schema.name, descriptor.name).await?;
                 proto::common::DbObject {
                     specification: Some(proto::common::db_object::Specification::Postgres(
-                        proto::common::PostgresObject {
-                            object: Some(proto::common::postgres_object::Object::Table(table)),
+                        proto::postgresql::PostgresObject {
+                            object: Some(proto::postgresql::postgres_object::Object::Table(table)),
                         },
                     )),
                 }
@@ -443,13 +467,13 @@ impl Connector for PostgresConnector {
         });
 
         if let Some(proto::common::db_object_descriptor::Descriptor::Postgres(
-            PostgresObjectDescriptor {
+            proto::postgresql::PostgresObjectDescriptor {
                 descriptor: Some(desc),
             },
         )) = req.descriptor
         {
             let table_name = match desc {
-                proto::common::postgres_object_descriptor::Descriptor::Table(
+                proto::postgresql::postgres_object_descriptor::Descriptor::Table(
                     postgres_table_descriptor,
                 ) => postgres_table_descriptor.name,
                 _ => {
@@ -496,7 +520,7 @@ impl Connector for PostgresConnector {
             let rows = client.query(&query, &[]).await?;
             let mut proto_rows = vec![];
             for row in rows {
-                let mut proto_row = proto::common::PostgresRecordTableRow { values: vec![] };
+                let mut proto_row = proto::postgresql::PostgresRecordTableRow { values: vec![] };
                 let columns = row.columns();
                 for column in columns {
                     let name = column.name();
@@ -505,17 +529,17 @@ impl Connector for PostgresConnector {
                         match column_type_name {
                             "bool" => {
                                 let value: Option<bool> = row.try_get(name)?;
-                                proto::common::DbField {
-                                    field: Some(proto::common::db_field::Field::Boolean(
-                                        proto::common::Boolean { boolean: value },
+                                proto::postgresql::DbField {
+                                    field: Some(proto::postgresql::db_field::Field::Boolean(
+                                        proto::postgresql::Boolean { boolean: value },
                                     )),
                                 }
                             }
                             "int2" => {
                                 let value: Option<i16> = row.try_get(name)?;
-                                proto::common::DbField {
-                                    field: Some(proto::common::db_field::Field::I16(
-                                        proto::common::Int16 {
+                                proto::postgresql::DbField {
+                                    field: Some(proto::postgresql::db_field::Field::I16(
+                                        proto::postgresql::Int16 {
                                             i16: value.map(|v| v as i32),
                                         },
                                     )),
@@ -523,34 +547,34 @@ impl Connector for PostgresConnector {
                             }
                             "int4" => {
                                 let value: Option<i32> = row.try_get(name)?;
-                                proto::common::DbField {
-                                    field: Some(proto::common::db_field::Field::I32(
-                                        proto::common::Int32 { i32: value },
+                                proto::postgresql::DbField {
+                                    field: Some(proto::postgresql::db_field::Field::I32(
+                                        proto::postgresql::Int32 { i32: value },
                                     )),
                                 }
                             }
                             "int8" => {
                                 let value: Option<i64> = row.try_get(name)?;
-                                proto::common::DbField {
-                                    field: Some(proto::common::db_field::Field::I64(
-                                        proto::common::Int64 { i64: value },
+                                proto::postgresql::DbField {
+                                    field: Some(proto::postgresql::db_field::Field::I64(
+                                        proto::postgresql::Int64 { i64: value },
                                     )),
                                 }
                             }
                             "varchar" => {
                                 let value: Option<String> = row.try_get(name)?;
-                                proto::common::DbField {
-                                    field: Some(proto::common::db_field::Field::Str(
-                                        proto::common::String { str: value },
+                                proto::postgresql::DbField {
+                                    field: Some(proto::postgresql::db_field::Field::Str(
+                                        proto::postgresql::String { str: value },
                                     )),
                                 }
                             }
                             "timestamptz" => {
                                 let value: std::time::SystemTime = row.try_get(name)?;
                                 let datetime: DateTime<Utc> = value.into();
-                                proto::common::DbField {
-                                    field: Some(proto::common::db_field::Field::Datetime(
-                                        proto::common::Timestamp {
+                                proto::postgresql::DbField {
+                                    field: Some(proto::postgresql::db_field::Field::Datetime(
+                                        proto::postgresql::Timestamp {
                                             datetime: Some(Timestamp {
                                                 seconds: datetime.timestamp(),
                                                 // TODO: also map nanos
@@ -572,14 +596,14 @@ impl Connector for PostgresConnector {
             }
             Ok(proto::common::DbRecord {
                 specification: Some(proto::common::db_record::Specification::Postgres(
-                    proto::common::PostgresRecord {
-                        record: Some(proto::common::postgres_record::Record::Table(
-                            proto::common::PostgresRecordTable {
+                    proto::postgresql::PostgresRecord {
+                        record: Some(proto::postgresql::postgres_record::Record::Table(
+                            proto::postgresql::PostgresRecordTable {
                                 columns: columns
                                     .iter()
-                                    .map(|column| proto::common::PostgresTableColumn {
+                                    .map(|column| proto::postgresql::PostgresTableColumn {
                                         name: column.0.clone(),
-                                        field: Some(proto::common::DbField::from_pg_type(
+                                        field: Some(proto::postgresql::DbField::from_pg_type(
                                             &column.1,
                                         )),
                                     })
@@ -606,12 +630,12 @@ impl Connector for PostgresConnector {
         match (req.record.specification, req.descriptor.descriptor) {
             (
                 Some(proto::common::db_record::Specification::Postgres(PostgresRecord {
-                    record: Some(proto::common::postgres_record::Record::Table(table)),
+                    record: Some(proto::postgresql::postgres_record::Record::Table(table)),
                 })),
                 Some(proto::common::db_object_descriptor::Descriptor::Postgres(
                     PostgresObjectDescriptor {
                         descriptor:
-                            Some(proto::common::postgres_object_descriptor::Descriptor::Table(
+                            Some(proto::postgresql::postgres_object_descriptor::Descriptor::Table(
                                 PostgresTableDescriptor {
                                     name: table_name, ..
                                 },
@@ -683,12 +707,12 @@ impl Connector for PostgresConnector {
         match (req.record.specification, req.descriptor.descriptor) {
             (
                 Some(proto::common::db_record::Specification::Postgres(PostgresRecord {
-                    record: Some(proto::common::postgres_record::Record::Table(table)),
+                    record: Some(proto::postgresql::postgres_record::Record::Table(table)),
                 })),
                 Some(proto::common::db_object_descriptor::Descriptor::Postgres(
                     PostgresObjectDescriptor {
                         descriptor:
-                            Some(proto::common::postgres_object_descriptor::Descriptor::Table(
+                            Some(proto::postgresql::postgres_object_descriptor::Descriptor::Table(
                                 PostgresTableDescriptor {
                                     name: table_name, ..
                                 },
@@ -757,15 +781,15 @@ impl Connector for PostgresConnector {
         ) {
             (
                 Some(proto::common::db_record::Specification::Postgres(PostgresRecord {
-                    record: Some(proto::common::postgres_record::Record::Table(old_table)),
+                    record: Some(proto::postgresql::postgres_record::Record::Table(old_table)),
                 })),
                 Some(proto::common::db_record::Specification::Postgres(PostgresRecord {
-                    record: Some(proto::common::postgres_record::Record::Table(new_table)),
+                    record: Some(proto::postgresql::postgres_record::Record::Table(new_table)),
                 })),
                 Some(proto::common::db_object_descriptor::Descriptor::Postgres(
                     PostgresObjectDescriptor {
                         descriptor:
-                            Some(proto::common::postgres_object_descriptor::Descriptor::Table(
+                            Some(proto::postgresql::postgres_object_descriptor::Descriptor::Table(
                                 PostgresTableDescriptor {
                                     name: table_name, ..
                                 },
@@ -868,10 +892,10 @@ async fn load_database_object(
 
     Ok(proto::common::DbObject {
         specification: Some(proto::common::db_object::Specification::Postgres(
-            proto::common::PostgresObject {
-                object: Some(proto::common::postgres_object::Object::Database(
-                    proto::common::PostgresDatabase {
-                        descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+            proto::postgresql::PostgresObject {
+                object: Some(proto::postgresql::postgres_object::Object::Database(
+                    proto::postgresql::PostgresDatabase {
+                        descriptor: Some(proto::postgresql::PostgresDatabaseDescriptor {
                             name: database_name.clone(),
                         }),
                         schemas: schema_objects,
@@ -886,7 +910,7 @@ async fn load_schema_object(
     client: &tokio_postgres::Client,
     database_name: String,
     schema_name: String,
-) -> Result<proto::common::PostgresSchema, crate::core::dbclient::connector::ConnectorError> {
+) -> Result<proto::postgresql::PostgresSchema, crate::core::dbclient::connector::ConnectorError> {
     let schema_exists = client
         .query_opt(
             "SELECT 1
@@ -934,7 +958,7 @@ async fn load_schema_object(
         )
         .await?
         .into_iter()
-        .map(|row| proto::common::PostgresView { name: row.get(0) })
+        .map(|row| proto::postgresql::PostgresView { name: row.get(0) })
         .collect();
     let materialized_views = client
         .query(
@@ -946,7 +970,7 @@ async fn load_schema_object(
         )
         .await?
         .into_iter()
-        .map(|row| proto::common::PostgresView { name: row.get(0) })
+        .map(|row| proto::postgresql::PostgresView { name: row.get(0) })
         .collect();
     let functions = client
         .query(
@@ -958,12 +982,12 @@ async fn load_schema_object(
         )
         .await?
         .into_iter()
-        .map(|row| proto::common::PostgresFunction { name: row.get(0) })
+        .map(|row| proto::postgresql::PostgresFunction { name: row.get(0) })
         .collect();
 
-    Ok(proto::common::PostgresSchema {
-        descriptor: Some(proto::common::PostgresSchemaDescriptor {
-            upstream_descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+    Ok(proto::postgresql::PostgresSchema {
+        descriptor: Some(proto::postgresql::PostgresSchemaDescriptor {
+            upstream_descriptor: Some(proto::postgresql::PostgresDatabaseDescriptor {
                 name: database_name,
             }),
             name: schema_name,
@@ -980,7 +1004,7 @@ async fn load_table_object(
     database_name: String,
     schema_name: String,
     table_name: String,
-) -> Result<proto::common::PostgresTable, crate::core::dbclient::connector::ConnectorError> {
+) -> Result<proto::postgresql::PostgresTable, crate::core::dbclient::connector::ConnectorError> {
     let table_exists = client
         .query_opt(
             "SELECT 1
@@ -1008,9 +1032,9 @@ async fn load_table_object(
         .into_iter()
         .map(|row| {
             let type_name: String = row.get(1);
-            proto::common::PostgresTableColumn {
+            proto::postgresql::PostgresTableColumn {
                 name: row.get(0),
-                field: Some(proto::common::DbField::from_pg_type(type_name.as_str())),
+                field: Some(proto::postgresql::DbField::from_pg_type(type_name.as_str())),
             }
         })
         .collect();
@@ -1024,7 +1048,7 @@ async fn load_table_object(
         )
         .await?
         .into_iter()
-        .map(|row| proto::common::PostgresTableConstrain { name: row.get(0) })
+        .map(|row| proto::postgresql::PostgresTableConstrain { name: row.get(0) })
         .collect();
     let indexes = client
         .query(
@@ -1036,13 +1060,13 @@ async fn load_table_object(
         )
         .await?
         .into_iter()
-        .map(|row| proto::common::PostgresTableIndex { name: row.get(0) })
+        .map(|row| proto::postgresql::PostgresTableIndex { name: row.get(0) })
         .collect();
 
-    Ok(proto::common::PostgresTable {
-        descriptor: Some(proto::common::PostgresTableDescriptor {
-            upstream_descriptor: Some(proto::common::PostgresSchemaDescriptor {
-                upstream_descriptor: Some(proto::common::PostgresDatabaseDescriptor {
+    Ok(proto::postgresql::PostgresTable {
+        descriptor: Some(proto::postgresql::PostgresTableDescriptor {
+            upstream_descriptor: Some(proto::postgresql::PostgresSchemaDescriptor {
+                upstream_descriptor: Some(proto::postgresql::PostgresDatabaseDescriptor {
                     name: database_name,
                 }),
                 name: schema_name,
@@ -1101,7 +1125,9 @@ mod integration_tests {
         let database = match object.specification {
             Some(proto::common::db_object::Specification::Postgres(postgres)) => {
                 match postgres.object {
-                    Some(proto::common::postgres_object::Object::Database(database)) => database,
+                    Some(proto::postgresql::postgres_object::Object::Database(database)) => {
+                        database
+                    }
                     other => panic!("expected a database object, got {other:?}"),
                 }
             }
@@ -1165,7 +1191,9 @@ mod integration_tests {
         let database = match object.specification {
             Some(proto::common::db_object::Specification::Postgres(postgres)) => {
                 match postgres.object {
-                    Some(proto::common::postgres_object::Object::Database(database)) => database,
+                    Some(proto::postgresql::postgres_object::Object::Database(database)) => {
+                        database
+                    }
                     other => panic!("expected a database object, got {other:?}"),
                 }
             }

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package dbclient.redis;
+
+message RedisObject {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    STRING = 1;
+  }
+  string name = 1;
+  Type obj_type = 2;
+}
+

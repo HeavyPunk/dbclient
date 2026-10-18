@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use crate::{
     core::proto::{
         self,
-        common::{db_field::Field, DbRecord, PostgresRecordTableRow},
+        common::{db_field::Field, DbRecord},
     },
     ui4::{
         app_state::{AppState, Page, QueryResultCmd},
@@ -23,6 +23,12 @@ use crate::{
         },
     },
 };
+
+fn postgres_field_from_common(field: &Field) -> proto::postgresql::DbField {
+    match field {
+        Field::Postgres(field) => field.clone(),
+    }
+}
 
 #[derive(PartialEq, Clone)]
 enum Popup {
@@ -281,14 +287,14 @@ pub fn QueryResult(
                             View (width: 100pct, height: 100pct) {
                                 #(
                                     match postgres_record.record.as_ref() {
-                                        Some(proto::common::postgres_record::Record::Table(table)) => {
+                                        Some(proto::postgresql::postgres_record::Record::Table(table)) => {
                                             let table_callback_state_on_add = props.state.clone();
                                             let table_callback_state_on_update = props.state.clone();
                                             let cmd_sender = props.cmd_pipe.clone();
                                             element! {
                                                 TableView(
                                                     columns: table.columns.iter().map(|column| column.name.clone()).collect::<Vec<_>>(),
-                                                    rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone()).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
+                                                    rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone().map(|field| Field::Postgres(proto::postgresql::DbField { field: Some(field) }))).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
                                                     has_focus: tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult),
                                                     on_add_row: Some(table_event_handler(move |_, _| {
                                                         let mut state_guard = tokio::task::block_in_place(|| table_callback_state_on_add.blocking_lock());
@@ -298,11 +304,11 @@ pub fn QueryResult(
                                                     on_update_row: Some(table_event_handler(move |columns, row| {
                                                         let mut state_guard = tokio::task::block_in_place(|| table_callback_state_on_update.blocking_lock());
                                                         let initial_record = proto::common::DbRecord {
-                                                            specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
-                                                                record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
-                                                                    columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
-                                                                    rows: vec![PostgresRecordTableRow {
-                                                                        values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
+                                                            specification: Some(proto::common::db_record::Specification::Postgres(proto::postgresql::PostgresRecord {
+                                                                record: Some(proto::postgresql::postgres_record::Record::Table(proto::postgresql::PostgresRecordTable {
+                                                                    columns: columns.iter().map(|c| proto::postgresql::PostgresTableColumn { name: c.clone(), field: None }).collect(),
+                                                                    rows: vec![proto::postgresql::PostgresRecordTableRow {
+                                                                        values: row.iter().map(postgres_field_from_common).collect()
                                                                     }]
                                                                 }))
                                                             }))
@@ -312,11 +318,11 @@ pub fn QueryResult(
                                                     })),
                                                     on_delete_row: Some(table_event_handler(move |columns, row| {
                                                         let cmd = QueryResultCmd::RemoveRecordFromObject(proto::common::DbRecord {
-                                                            specification: Some(proto::common::db_record::Specification::Postgres(proto::common::PostgresRecord {
-                                                                record: Some(proto::common::postgres_record::Record::Table(proto::common::PostgresRecordTable {
-                                                                    columns: columns.iter().map(|c| proto::common::PostgresTableColumn { name: c.clone(), field: None }).collect(),
-                                                                    rows: vec![PostgresRecordTableRow {
-                                                                        values: row.iter().map(|r| proto::common::DbField { field: Some(r.clone()) }).collect()
+                                                            specification: Some(proto::common::db_record::Specification::Postgres(proto::postgresql::PostgresRecord {
+                                                                record: Some(proto::postgresql::postgres_record::Record::Table(proto::postgresql::PostgresRecordTable {
+                                                                    columns: columns.iter().map(|c| proto::postgresql::PostgresTableColumn { name: c.clone(), field: None }).collect(),
+                                                                    rows: vec![proto::postgresql::PostgresRecordTableRow {
+                                                                        values: row.iter().map(postgres_field_from_common).collect()
                                                                     }]
                                                                 }))
                                                             }))
