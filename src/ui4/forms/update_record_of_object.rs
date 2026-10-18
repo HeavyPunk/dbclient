@@ -193,7 +193,12 @@ fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyE
         .get(index)
         .map(|field| field.draft.clone())
         .unwrap_or_default();
+
+    // NOTE: layout_ready is used to prevent invalid TextInput render on the first time render.
+    // Multiline mode should be enabled only after fully built widget layout
+    let mut layout_ready = false;
     if let Some(rect) = hooks.use_component_rect() {
+        layout_ready = true;
         let height = rect.bottom.saturating_sub(rect.top) as usize;
         let mut next_heights = heights.read().clone();
         if next_heights.get(index).copied() != Some(height) {
@@ -234,8 +239,8 @@ fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyE
                 TextInput(
                     has_focus: props.has_focus,
                     value,
-                    multiline: true,
-                    auto_grow: true,
+                    multiline: layout_ready,
+                    auto_grow: layout_ready,
                     on_change: move |new_value| {
                         let mut next_fields = fields.read().clone();
                         let Some(field) = next_fields.get_mut(index) else { return; };
@@ -315,7 +320,7 @@ fn fields_into_record(
     result
 }
 
-fn field_type_into_string(field: &proto::common::DbField) -> Option<&'static str> {
+pub fn field_type_into_string(field: &proto::common::DbField) -> Option<&'static str> {
     match field.field {
         Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
             field: Some(proto::postgresql::db_field::Field::I8(_)),

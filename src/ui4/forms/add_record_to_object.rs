@@ -180,6 +180,7 @@ pub fn AddRecordToObjectForm(
                                     FormTextInput(
                                         has_focus: if let Some(ff) = focused_field.read().as_ref() { *ff == i } else { false },
                                         field_name: f.0.clone(),
+                                        field_meta: f.1.clone(),
                                         drafts: Some(drafts),
                                         heights: Some(field_heights),
                                         index: i,
@@ -198,6 +199,7 @@ pub fn AddRecordToObjectForm(
 struct FormTextInputProps {
     has_focus: bool,
     field_name: String,
+    field_meta: Option<proto::common::DbField>,
     drafts: Option<State<Vec<String>>>,
     heights: Option<State<Vec<usize>>>,
     index: usize,
@@ -213,7 +215,12 @@ fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyE
     };
     let index = props.index;
     let value = drafts.read().get(index).cloned().unwrap_or_default();
+
+    // NOTE: layout_ready is used to prevent invalid TextInput render on the first time render.
+    // Multiline mode should be enabled only after fully built widget layout
+    let mut layout_ready = false;
     if let Some(rect) = hooks.use_component_rect() {
+        layout_ready = true;
         let height = rect.bottom.saturating_sub(rect.top) as usize;
         let mut next_heights = heights.read().clone();
         if next_heights.get(index).copied() != Some(height) {
@@ -227,12 +234,25 @@ fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyE
     element! {
         View (width: 100pct) {
             View(
+                flex_direction: iocraft::FlexDirection::Column,
                 margin_right: 1,
             ) {
-                Text(
-                    content: props.field_name.clone(),
-                    color: Color::Blue
-                )
+                View {
+                    Text(
+                        content: props.field_name.clone(),
+                        color: Color::Blue
+                    )   
+                }
+                View {
+                    Text(
+                        content: if let Some(s) = props.field_meta.as_ref().and_then(|fm| super::update_record_of_object::field_type_into_string(fm)) {
+                            format!("({s})")
+                        } else {
+                            String::default()
+                        },
+                        color: Color::DarkGrey
+                    )
+                }
             }
             View(
                 background_color: if props.has_focus { Some(Color::DarkGrey) } else { None },
@@ -241,8 +261,8 @@ fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyE
                 TextInput(
                     has_focus: props.has_focus,
                     value,
-                    multiline: true,
-                    auto_grow: true,
+                    multiline: layout_ready,
+                    auto_grow: layout_ready,
                     on_change: move |new_value| {
                         let mut next_drafts = drafts.read().clone();
                         if let Some(draft) = next_drafts.get_mut(index) {
