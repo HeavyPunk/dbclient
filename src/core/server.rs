@@ -51,7 +51,10 @@ impl super::proto::connections::ConnectionsService for ConnectionsServer {
             connections: self
                 .conns
                 .iter()
-                .map(|c| proto::connections::Connection { id: c.name.clone() })
+                .map(|c| proto::connections::Connection {
+                    id: c.name.clone(),
+                    r#type: format!("{}", c.connection_type),
+                })
                 .collect(),
         })
     }

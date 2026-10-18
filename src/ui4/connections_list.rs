@@ -150,7 +150,7 @@ pub async fn ConnectionsList(
                     }
                     View(width: 50pct, justify_content: JustifyContent::Center, padding_right: 2) {
                         Text(
-                            content: "TODO".to_string(),
+                            content: connection.r#type.clone(),
                             color: if selected_row.get() == i || i % 2 != 0 {
                                 Some(Color::Black)
                             } else {None}

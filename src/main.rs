@@ -33,9 +33,7 @@ async fn main() -> Result<()> {
     let queries_client: Arc<dyn core::proto::queries::QueriesService + Send + Sync> =
         Arc::new(core::server::QueriesServer::new(&config.connections));
     let app_state = Arc::new(Mutex::new(AppState {
-        selected_connection: Some(core::proto::connections::Connection {
-            id: "default".to_string(),
-        }),
+        selected_connection: None,
         selected_object: None,
         selected_page: Page::ConnectionsList,
         focus_widget: ui4::app_state::Widget::default(),
@@ -44,14 +42,16 @@ async fn main() -> Result<()> {
     let (query_result_cmd_sender, query_result_cmd_reader) =
         tokio::sync::mpsc::channel::<QueryResultCmd>(10);
 
-    element!(ui4::app_state::AppContainer(
-        connections_client: Some(connections_client),
-        objects_client: Some(db_objects_client),
-        queries_client: Some(queries_client),
-        state: app_state,
-        query_result_cmd_pipe: Some(query_result_cmd_sender),
-        query_result_cmd_receiver: Some(query_result_cmd_reader),
-    ))
+    element!(
+        ui4::app_state::AppContainer(
+            connections_client: Some(connections_client),
+            objects_client: Some(db_objects_client),
+            queries_client: Some(queries_client),
+            state: app_state,
+            query_result_cmd_pipe: Some(query_result_cmd_sender),
+            query_result_cmd_receiver: Some(query_result_cmd_reader),
+        )
+    )
     .render_loop()
     .await
     .context("app container execution error")

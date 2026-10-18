@@ -15,4 +15,5 @@ message GetAvailableConnectionsResponse {
 
 message Connection {
   string id = 1;
+  string type = 2;
 }
