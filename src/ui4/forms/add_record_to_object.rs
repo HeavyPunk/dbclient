@@ -241,7 +241,7 @@ fn FormTextInput(props: &FormTextInputProps, mut hooks: Hooks) -> impl Into<AnyE
                     Text(
                         content: props.field_name.clone(),
                         color: Color::Blue
-                    )   
+                    )
                 }
                 View {
                     Text(
