@@ -113,6 +113,7 @@ pub fn AddRecordToObjectForm(
                             return false;
                         };
                         let Ok(value) = field_from_string(input, initial_field) else {
+                            log::warn!(target: "add_record_to_object", "Invalid field value: `{}`", input);
                             return false;
                         };
                         let Some(field) = field_at_mut_postgres(&mut specification, index) else {

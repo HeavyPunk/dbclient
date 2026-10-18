@@ -4,7 +4,7 @@ use iocraft::{
     component,
     components::{BorderStyle, Text, View},
     element,
-    hooks::{UseFuture, UseState, UseTerminalEvents},
+    hooks::{State, UseFuture, UseState, UseTerminalEvents},
     AlignContent, AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Position, Props,
 };
 use tokio::sync::Mutex;
@@ -59,13 +59,13 @@ pub fn QueryResult(
 
     let state = props.state.clone();
     let Some(self_cmd_sender) = props.cmd_pipe.clone() else {
-        // TODO: maybe log this branch
+        log::warn!("cmd_pipe is undefined, sending commands to pipe is impossible");
         return element! {
             View
         };
     };
     let Some(cmd_receiver) = props.cmd_receiver.clone() else {
-        // TODO: maybe log this branch
+        log::warn!("cmd_receiver is undefined, getting commands from pipe is impossible");
         return element! {
             View
         };
@@ -76,138 +76,23 @@ pub fn QueryResult(
                 let mut receiver = cmd_receiver.lock().await;
                 receiver.recv().await
             };
-            match cmd {
-                Some(QueryResultCmd::ExecuteRawQuery) => {
-                    todo!()
+            let res = run_cmd(
+                &cmd,
+                &state,
+                &queries_client,
+                &mut to_visualize,
+                &mut render_popup,
+                &mut selected_object,
+                &self_cmd_sender,
+            )
+            .await;
+            if let Err(e) = res {
+                if let Some(cmd) = cmd {
+                    log::warn!("Error on performing cmd {cmd}: {e}");
+                } else {
+                    log::warn!("Error on performing cmd: {e}")
                 }
-                Some(QueryResultCmd::ListAllItemsFromObject) => {
-                    let (connection, object) = {
-                        let state = state.lock().await;
-                        (
-                            state.selected_connection.clone(),
-                            state.selected_object.clone(),
-                        )
-                    };
-                    match (&queries_client, &connection, &object) {
-                        (Some(client), Some(selected_connection), Some(selected_object)) => {
-                            let resp = client
-                                .list_all_items_from_object(
-                                    proto::queries::ListAllItemsFromObjectRequest {
-                                        connection: Some(selected_connection.clone()),
-                                        object: Some(selected_object.clone()),
-                                    },
-                                )
-                                .await;
-                            if let Ok(resp) = resp {
-                                if resp.record.is_some() {
-                                    to_visualize.set(resp.record.unwrap());
-                                }
-                            }
-                        }
-                        _ => { /* cannot perform operation */ }
-                    }
-                }
-                Some(QueryResultCmd::AddRecordToObject(record)) => {
-                    let (connection, object) = {
-                        let state = state.lock().await;
-                        (
-                            state.selected_connection.clone(),
-                            state.selected_object.clone(),
-                        )
-                    };
-                    match (&queries_client, &connection, &object) {
-                        (Some(client), Some(selected_connection), Some(selected_object)) => {
-                            let _r = client
-                                .add_record_to_object(proto::queries::AddRecordToObjectRequest {
-                                    connection: Some(selected_connection.clone()),
-                                    object: Some(selected_object.clone()),
-                                    record: Some(record.clone()),
-                                })
-                                .await;
-                            // TODO: log if error + restore records from object after operation done
-                        }
-                        _ => {}
-                    }
-                    // TODO: log
-                    let _ = self_cmd_sender.send(QueryResultCmd::ClosePopup).await;
-                    let _ = self_cmd_sender
-                        .send(QueryResultCmd::ListAllItemsFromObject)
-                        .await;
-                }
-                Some(QueryResultCmd::RemoveRecordFromObject(record)) => {
-                    let (connection, object) = {
-                        let state = state.lock().await;
-                        (
-                            state.selected_connection.clone(),
-                            state.selected_object.clone(),
-                        )
-                    };
-                    match (&queries_client, &connection, &object) {
-                        (Some(client), Some(selected_connection), Some(selected_object)) => {
-                            let _r = client
-                                .remove_record_from_object(
-                                    proto::queries::RemoveRecordFromObjectRequest {
-                                        connection: Some(selected_connection.clone()),
-                                        object: Some(selected_object.clone()),
-                                        record: Some(record.clone()),
-                                    },
-                                )
-                                .await;
-                            // TODO: log if error + restore records from object after operation done
-                        }
-                        _ => {}
-                    }
-
-                    // TODO: log
-                    let _ = self_cmd_sender
-                        .send(QueryResultCmd::ListAllItemsFromObject)
-                        .await;
-                }
-                Some(QueryResultCmd::UpdateRecordOfObject(old_record, new_record)) => {
-                    let (connection, object) = {
-                        let state = state.lock().await;
-                        (
-                            state.selected_connection.clone(),
-                            state.selected_object.clone(),
-                        )
-                    };
-                    match (&queries_client, &connection, &object) {
-                        (Some(client), Some(selected_connection), Some(selected_object)) => {
-                            let _r = client
-                                .update_record_of_object(
-                                    proto::queries::UpdateRecordOfObjectRequest {
-                                        connection: Some(selected_connection.clone()),
-                                        object: Some(selected_object.clone()),
-                                        old_record: Some(old_record.clone()),
-                                        new_record: Some(new_record.clone()),
-                                    },
-                                )
-                                .await;
-                            // TODO: log if error + restore records from object after operation done
-                        }
-                        _ => {}
-                    }
-                    // TODO: log
-                    let _ = self_cmd_sender.send(QueryResultCmd::ClosePopup).await;
-                    let _ = self_cmd_sender
-                        .send(QueryResultCmd::ListAllItemsFromObject)
-                        .await;
-                }
-                Some(QueryResultCmd::OpenAddRecordPopup) => {
-                    render_popup.set(Some(Popup::AddRecordToObject(false)));
-                }
-                Some(QueryResultCmd::ClosePopup) => {
-                    // NOTE: wait until other widgets hooks observe event as trash before enable
-                    // QueryResult widget as event consumer
-                    // see race condition problem here in hooks.use_local_terminal_events
-                    tokio::time::sleep(Duration::from_millis(100)).await;
-                    selected_object.set(None);
-                    render_popup.set(None);
-                    let mut state = state.lock().await;
-                    state.focus_widget = crate::ui4::app_state::Widget::QueryResult;
-                }
-                _ => {}
-            };
+            }
         }
     });
 
@@ -232,11 +117,10 @@ pub fn QueryResult(
                                     },
                                 )
                                 .await;
-                            if let Ok(r) = obj {
-                                selected_object.set(r.object);
-                            } else {
-                                panic!("Error: {:?}", obj) // TODO: add log here if error
-                            }
+                            match obj {
+                                Ok(r) => selected_object.set(r.object),
+                                Err(e) => log::error!(target: "query_result", "Error on get object of descriptor: {e}")
+                            };
                         }
                         None => {}
                     };
@@ -397,4 +281,139 @@ pub fn QueryResult(
             )
         }
     }
+}
+
+async fn run_cmd(
+    cmd: &Option<QueryResultCmd>,
+    state: &Mutex<AppState>,
+    queries_client: &Option<Arc<dyn proto::queries::QueriesService + Send + Sync>>,
+    to_visualize: &mut State<DbRecord>,
+    render_popup: &mut State<Option<Popup>>,
+    selected_object: &mut State<Option<proto::common::DbObject>>,
+    self_cmd_sender: &tokio::sync::mpsc::Sender<QueryResultCmd>,
+) -> anyhow::Result<()> {
+    return match cmd {
+        Some(QueryResultCmd::ExecuteRawQuery) => {
+            Err(anyhow::anyhow!("operation not yet implemented"))
+        }
+        Some(QueryResultCmd::ListAllItemsFromObject) => {
+            let (connection, object) = {
+                let state = state.lock().await;
+                (
+                    state.selected_connection.clone(),
+                    state.selected_object.clone(),
+                )
+            };
+            match (&queries_client, &connection, &object) {
+                (Some(client), Some(selected_connection), Some(selected_object)) => {
+                    match client.list_all_items_from_object(
+                        proto::queries::ListAllItemsFromObjectRequest {
+                            connection: Some(selected_connection.clone()),
+                            object: Some(selected_object.clone()),
+                        }).await {
+                        Ok(resp) => {
+                            if resp.record.is_some() {
+                                to_visualize.set(resp.record.unwrap());
+                            }
+                            Ok(())
+                        },
+                        Err(e) => Err(e),
+                    }
+                }
+                _ => Err(anyhow::anyhow!("cannot performing operation, client, selected_connection or selected_object is undefined"))
+            }.map_err(|e| anyhow::anyhow!("Error on list all items from object: {e}"))
+        }
+        Some(QueryResultCmd::AddRecordToObject(record)) => {
+            let (connection, object) = {
+                let state = state.lock().await;
+                (
+                    state.selected_connection.clone(),
+                    state.selected_object.clone(),
+                )
+            };
+            match (&queries_client, &connection, &object) {
+                (Some(client), Some(selected_connection), Some(selected_object)) => {
+                    client.add_record_to_object(proto::queries::AddRecordToObjectRequest {
+                        connection: Some(selected_connection.clone()),
+                        object: Some(selected_object.clone()),
+                        record: Some(record.clone()),
+                    }).await
+                }
+                _ => Err(anyhow::anyhow!("cannot performing operation, client, selected_connection or selected_object is undefined"))
+            }.map_err(|e| anyhow::anyhow!("Error on add record to object: {e}"))?;
+
+            self_cmd_sender.send(QueryResultCmd::ClosePopup).await?;
+            self_cmd_sender
+                .send(QueryResultCmd::ListAllItemsFromObject)
+                .await?;
+            Ok(())
+        }
+        Some(QueryResultCmd::RemoveRecordFromObject(record)) => {
+            let (connection, object) = {
+                let state = state.lock().await;
+                (
+                    state.selected_connection.clone(),
+                    state.selected_object.clone(),
+                )
+            };
+            match (&queries_client, &connection, &object) {
+                (Some(client), Some(selected_connection), Some(selected_object)) => {
+                    client.remove_record_from_object(
+                        proto::queries::RemoveRecordFromObjectRequest {
+                            connection: Some(selected_connection.clone()),
+                            object: Some(selected_object.clone()),
+                            record: Some(record.clone()),
+                        }).await
+                }
+                _ => Err(anyhow::anyhow!("cannot performing operation, client, selected_connection or selected_object is undefined"))
+            }.map_err(|e| anyhow::anyhow!("Error on remove record from object: {e}"))?;
+
+            let _ = self_cmd_sender
+                .send(QueryResultCmd::ListAllItemsFromObject)
+                .await?;
+            Ok(())
+        }
+        Some(QueryResultCmd::UpdateRecordOfObject(old_record, new_record)) => {
+            let (connection, object) = {
+                let state = state.lock().await;
+                (
+                    state.selected_connection.clone(),
+                    state.selected_object.clone(),
+                )
+            };
+            match (&queries_client, &connection, &object) {
+                (Some(client), Some(selected_connection), Some(selected_object)) => {
+                    client.update_record_of_object(
+                        proto::queries::UpdateRecordOfObjectRequest {
+                            connection: Some(selected_connection.clone()),
+                            object: Some(selected_object.clone()),
+                            old_record: Some(old_record.clone()),
+                            new_record: Some(new_record.clone()),
+                        }).await
+                }
+                _ => Err(anyhow::anyhow!("cannot performing operation, client, selected_connection or selected_object is undefined"))
+            }.map_err(|e| anyhow::anyhow!("Error on update record of object: {e}"))?;
+            self_cmd_sender.send(QueryResultCmd::ClosePopup).await?;
+            self_cmd_sender
+                .send(QueryResultCmd::ListAllItemsFromObject)
+                .await?;
+            Ok(())
+        }
+        Some(QueryResultCmd::OpenAddRecordPopup) => {
+            render_popup.set(Some(Popup::AddRecordToObject(false)));
+            Ok(())
+        }
+        Some(QueryResultCmd::ClosePopup) => {
+            // NOTE: wait until other widgets hooks observe event as trash before enable
+            // QueryResult widget as event consumer
+            // see race condition problem here in hooks.use_local_terminal_events
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            selected_object.set(None);
+            render_popup.set(None);
+            let mut state = state.lock().await;
+            state.focus_widget = crate::ui4::app_state::Widget::QueryResult;
+            Ok(())
+        }
+        _ => Ok(()),
+    };
 }

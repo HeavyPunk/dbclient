@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{sync::Arc, time::Duration};
 
 use iocraft::{
@@ -48,6 +49,20 @@ pub enum QueryResultCmd {
     UpdateRecordOfObject(proto::common::DbRecord, proto::common::DbRecord),
     OpenAddRecordPopup,
     ClosePopup,
+}
+
+impl fmt::Display for QueryResultCmd {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QueryResultCmd::ExecuteRawQuery => write!(f, "ExecuteRawQuery"),
+            QueryResultCmd::ListAllItemsFromObject => write!(f, "ListAllItemsFromObject"),
+            QueryResultCmd::AddRecordToObject(_) => write!(f, "AddRecordToObject"),
+            QueryResultCmd::RemoveRecordFromObject(_) => write!(f, "RemoveRecordFromObject"),
+            QueryResultCmd::UpdateRecordOfObject(_, _) => write!(f, "UpdateRecordOfObject"),
+            QueryResultCmd::OpenAddRecordPopup => write!(f, "OpenAddRecordPopup"),
+            QueryResultCmd::ClosePopup => write!(f, "ClosePopup"),
+        }
+    }
 }
 
 #[derive(Default)]

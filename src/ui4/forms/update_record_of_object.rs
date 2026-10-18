@@ -94,6 +94,7 @@ pub fn UpdateRecordOfObject(
                                 initial_field,
                             )
                         else {
+                            log::warn!(target: "update_record_of_object", "Invalid field value: `{}`", &field.draft);
                             return false;
                         };
                         field.value.field = Some(new_field);

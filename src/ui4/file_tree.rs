@@ -114,7 +114,9 @@ pub fn FileTree<T: Clone + Send + Sync + 'static>(
     let visible = flatten(&nodes, &expanded.read());
 
     if visible.is_empty() {
-        cursor.set(0);
+        if cursor.get() != 0 {
+            cursor.set(0);
+        }
     } else if cursor.get() >= visible.len() {
         cursor.set(visible.len() - 1);
     }
