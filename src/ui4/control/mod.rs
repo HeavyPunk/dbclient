@@ -70,9 +70,12 @@ impl<FocusGetter: Fn() -> bool + Send + Unpin> Hook for UseHotkeysImpl<FocusGett
                             return Poll::Pending;
                         }
                     }
-                    let _ = self.hotkey_manager.push((code, modifiers, kind));
-                    // TODO: log debug if combination doesn't match
-                    let _ = self.hotkey_manager.invoke_if_matched(&mut ());
+                    if let Err(e) = self.hotkey_manager.push((code, modifiers, kind)) {
+                        log::debug!(target: "hotkey_manager", "Error on push event: {e}");
+                    }
+                    if let Err(e) = self.hotkey_manager.invoke_if_matched(&mut ()) {
+                        log::debug!(target: "hotkey_manager", "Error on invoke callback: {e}");
+                    }
                 }
                 _ => {}
             }

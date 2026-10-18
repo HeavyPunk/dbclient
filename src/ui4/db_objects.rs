@@ -186,12 +186,13 @@ fn specification_node(
                                     ),
                                 });
                             }
-                            // TODO: log if error
-                            let _ = tokio::task::block_in_place(|| {
+                            if let Err(e) = tokio::task::block_in_place(|| {
                                 cmd_pipe.blocking_send(
                                     super::app_state::QueryResultCmd::ListAllItemsFromObject,
                                 )
-                            });
+                            }) {
+                                log::warn!(target: "db_object", "Error on list all items from object {e}");
+                            }
                         });
                 }
                 node
@@ -236,14 +237,16 @@ pub fn DbObjects(props: &DbObjectsProps, mut hooks: Hooks) -> impl Into<AnyEleme
             let Some(connection) = state.lock().await.selected_connection.clone() else {
                 return;
             };
-            // TODO: log if error
-            if let Ok(response) = client
+            match client
                 .get_objects_of_connection(proto::objects::GetObjectsOfConnectionRequest {
                     connection: Some(connection),
                 })
                 .await
             {
-                objects.set(response.objects);
+                Ok(response) => objects.set(response.objects),
+                Err(e) => {
+                    log::error!(target: "db_object", "Error on getting objects of connection: {e}")
+                }
             }
         });
     }

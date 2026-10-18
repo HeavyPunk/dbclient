@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use cli::Cli;
 use config::Config;
+use flexi_logger::{FileSpec, Logger, WriteMode};
 use iocraft::{element, ElementExt};
 use tokio::sync::Mutex;
 
@@ -13,14 +14,20 @@ mod config;
 mod core;
 mod ui4;
 
+const DBCLIENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    init_logger()?;
+
     let args = Cli::parse();
 
     let config_content =
         std::fs::read_to_string(&args.config_path).expect("Failed to read config file");
 
     let config: Config = toml::from_str(&config_content).expect("Failed to parse config file");
+
+    log::info!("DBCLIENT version is {DBCLIENT_VERSION}. Application started with UI mode");
 
     let connections_client: Arc<dyn core::proto::connections::ConnectionsService + Send + Sync> =
         Arc::new(core::server::ConnectionsServer::new(
@@ -55,4 +62,27 @@ async fn main() -> Result<()> {
     .render_loop()
     .await
     .context("app container execution error")
+}
+
+fn init_logger() -> Result<()> {
+    let Some(mut logs_dir_path) = dirs::state_dir().or_else(|| dirs::data_local_dir()) else {
+        return Err(anyhow::anyhow!("Can't determine state or data local dir"));
+    };
+    logs_dir_path.push("dbclient");
+    logs_dir_path.push("logs");
+
+    std::fs::create_dir_all(&logs_dir_path)?;
+
+    Logger::try_with_env_or_str("info")?
+        .log_to_file(
+            FileSpec::default()
+                .directory(logs_dir_path)
+                .basename("dbclient")
+                .suffix("log")
+                .use_timestamp(false),
+        )
+        .write_mode(WriteMode::BufferAndFlush)
+        .start()?;
+
+    Ok(())
 }

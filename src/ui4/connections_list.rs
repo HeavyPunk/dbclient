@@ -37,11 +37,9 @@ pub async fn ConnectionsList(
     if let Some(client) = props.connections_client.clone() {
         let mut connections = connections.clone();
         hooks.use_future(async move {
-            if let Ok(response) = client
-                .get_available_list(GetAvailableConnectionsRequest {})
-                .await
-            {
-                connections.set(response.connections);
+            match client.get_available_list(GetAvailableConnectionsRequest {}).await {
+                Ok(response) => connections.set(response.connections),
+                Err(e) => log::error!(target: "connections_client", "Error on getting available connections: {e}"),
             }
         });
     }
