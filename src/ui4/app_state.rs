@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{sync::Arc, time::Duration};
 
+use dbclient::virtual_logger::Notification;
 use iocraft::{
     component,
     components::View,
@@ -12,7 +13,10 @@ use tokio::sync::Mutex;
 
 use crate::{
     core::proto,
-    ui4::{connections_list::ConnectionsList, query_area::QueryArea},
+    ui4::{
+        components::notification_widget::NotificationWidget, connections_list::ConnectionsList,
+        query_area::QueryArea,
+    },
 };
 
 #[derive(Clone, Copy, PartialEq)]
@@ -81,6 +85,7 @@ pub struct AppContainerProps {
     pub state: Arc<Mutex<AppState>>,
     pub query_result_cmd_pipe: Option<tokio::sync::mpsc::Sender<QueryResultCmd>>,
     pub query_result_cmd_receiver: Option<tokio::sync::mpsc::Receiver<QueryResultCmd>>,
+    pub notification_receiver: Option<tokio::sync::mpsc::Receiver<Notification>>,
 }
 
 #[component]
@@ -134,6 +139,13 @@ pub fn AppContainer(
                     }
                 },
             })
+            View (
+                position: iocraft::Position::Absolute,
+                right: 2,
+                bottom: 1,
+            ) {
+                NotificationWidget(notification_receiver: props.notification_receiver.take())
+            }
         }
     }
 }

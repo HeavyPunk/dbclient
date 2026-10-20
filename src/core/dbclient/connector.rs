@@ -1,9 +1,20 @@
+use core::fmt;
+
 use crate::core::proto;
 
 #[derive(Debug)]
 pub enum ConnectorError {
     InvalidRequest(&'static str),
     PostgresError(tokio_postgres::Error),
+}
+
+impl fmt::Display for ConnectorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConnectorError::InvalidRequest(s) => write!(f, "invalid request: {s}"),
+            ConnectorError::PostgresError(e) => write!(f, "postgres error: {e}"),
+        }
+    }
 }
 
 pub type GetObjectsResult = proto::common::DbObject;
