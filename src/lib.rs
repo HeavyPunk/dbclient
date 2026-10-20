@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 
 pub mod hotkey_manager;
+pub mod virtual_logger;
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum Field {

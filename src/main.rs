@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use cli::Cli;
 use config::Config;
+use dbclient::virtual_logger::{Notification, VirtualLogger};
 use flexi_logger::{FileSpec, Logger, WriteMode};
 use iocraft::{element, ElementExt};
 use tokio::sync::Mutex;
@@ -18,7 +19,10 @@ const DBCLIENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_logger()?;
+    let (notification_sender, notification_receiver) =
+        tokio::sync::mpsc::channel::<Notification>(10);
+
+    init_logger(true, Some(notification_sender))?;
 
     let args = Cli::parse();
 
@@ -57,6 +61,7 @@ async fn main() -> Result<()> {
             state: app_state,
             query_result_cmd_pipe: Some(query_result_cmd_sender),
             query_result_cmd_receiver: Some(query_result_cmd_reader),
+            notification_receiver: Some(notification_receiver),
         )
     )
     .render_loop()
@@ -64,7 +69,10 @@ async fn main() -> Result<()> {
     .context("app container execution error")
 }
 
-fn init_logger() -> Result<()> {
+fn init_logger(
+    ui_mode: bool,
+    notification_sender: Option<tokio::sync::mpsc::Sender<Notification>>,
+) -> Result<()> {
     let Some(mut logs_dir_path) = dirs::state_dir().or_else(|| dirs::data_local_dir()) else {
         return Err(anyhow::anyhow!("Can't determine state or data local dir"));
     };
@@ -73,16 +81,24 @@ fn init_logger() -> Result<()> {
 
     std::fs::create_dir_all(&logs_dir_path)?;
 
-    Logger::try_with_env_or_str("info")?
-        .log_to_file(
-            FileSpec::default()
-                .directory(logs_dir_path)
-                .basename("dbclient")
-                .suffix("log")
-                .use_timestamp(false),
-        )
-        .write_mode(WriteMode::BufferAndFlush)
-        .start()?;
+    let mut logger = Logger::try_with_env_or_str("info")?.write_mode(WriteMode::BufferAndFlush);
+
+    let file_spec = FileSpec::default()
+        .directory(logs_dir_path)
+        .basename("dbclient")
+        .suffix("log")
+        .use_timestamp(false);
+
+    if ui_mode {
+        logger = logger.log_to_file_and_writer(
+            file_spec,
+            Box::new(VirtualLogger::new(notification_sender.unwrap())),
+        );
+    } else {
+        logger = logger.log_to_file(file_spec);
+    }
+
+    logger.start()?;
 
     Ok(())
 }

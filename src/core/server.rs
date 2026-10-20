@@ -74,9 +74,9 @@ enum ObjectsServerErrors {
 impl fmt::Display for ObjectsServerErrors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ObjectsServerErrors::ValidationError(e) => write!(f, "validation error: {}", e),
+            ObjectsServerErrors::ValidationError(e) => write!(f, "validation error: {e}"),
             ObjectsServerErrors::ConnectionNotFound => write!(f, "connection not found"),
-            ObjectsServerErrors::ConnectorError(_) => write!(f, "connector error"),
+            ObjectsServerErrors::ConnectorError(e) => write!(f, "connector error: {e}"),
         }
     }
 }
@@ -228,9 +228,9 @@ enum QueriesServerErrors {
 impl fmt::Display for QueriesServerErrors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            QueriesServerErrors::ValidationError(e) => write!(f, "validation error: {}", e),
+            QueriesServerErrors::ValidationError(e) => write!(f, "validation error: {e}"),
             QueriesServerErrors::ConnectionNotFound => write!(f, "connection not found"),
-            QueriesServerErrors::ConnectorError(_) => write!(f, "connector error"),
+            QueriesServerErrors::ConnectorError(e) => write!(f, "connector error: {e}"),
         }
     }
 }
