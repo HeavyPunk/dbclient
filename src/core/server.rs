@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt};
 
 use crate::config::Connection;
 use crate::core::dbclient::connector::{
-    self, Connector, ConnectorError, GetObjectRequest, ListAllItemsFromObjectResult,
+    self, Connector, ConnectorError, ListAllItemsFromObjectResult,
 };
 use crate::core::dbclient::postgresql::connector_impl::PostgresConnector;
 use crate::core::proto::common::{DbObjectDescriptor, DbRecord};
@@ -13,13 +13,7 @@ use crate::core::proto::queries::{
     RemoveRecordFromObjectRequest, RemoveRecordFromObjectResponse, UpdateRecordOfObjectRequest,
     UpdateRecordOfObjectResponse,
 };
-use crate::core::{
-    dbclient::{
-        dummy::DummyFetcher,
-        postgresql::{PostgresConfig, PostgresFetcher},
-        query_builder::QueryElement,
-        redis::{RedisConfig, RedisFetcher},
-    },
+use crate::core::
     proto::{
         self,
         common::DbObject,
@@ -28,8 +22,8 @@ use crate::core::{
             AddObjectToConnectionRequest, AddObjectToConnectionResponse,
             GetObjectsOfConnectionRequest, GetObjectsOfConnectionResponse,
         },
-    },
-};
+    }
+;
 
 pub struct ConnectionsServer {
     conns: Vec<Connection>,
@@ -169,7 +163,7 @@ impl super::proto::objects::ObjectsService for ObjectsServer {
 
     async fn add_object_to_connection(
         &self,
-        request: AddObjectToConnectionRequest,
+        _request: AddObjectToConnectionRequest,
     ) -> ::anyhow::Result<AddObjectToConnectionResponse> {
         // match request {
         //     AddObjectToConnectionRequest {
@@ -318,7 +312,7 @@ impl QueriesServer {
 impl super::proto::queries::QueriesService for QueriesServer {
     async fn execute_raw_query(
         &self,
-        request: ExecuteRawQueryRequest,
+        _request: ExecuteRawQueryRequest,
     ) -> ::anyhow::Result<ExecuteRawQueryResponse> {
         todo!()
     }

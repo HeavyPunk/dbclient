@@ -446,7 +446,7 @@ pub fn field_from_string(
                 )),
                 _ => Err(anyhow!("cannot be mapped into boolean")),
             },
-            proto::postgresql::db_field::Field::Datetime(timestamp) => {
+            proto::postgresql::db_field::Field::Datetime(_timestamp) => {
                 todo!("timestamp mapping")
             }
         },

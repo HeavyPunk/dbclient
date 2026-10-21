@@ -1114,7 +1114,7 @@ mod integration_tests {
     #[tokio::test]
     async fn get_objects_returns_database_and_empty_schema() {
         let schema = "connector_impl_empty_schema";
-        let mut client = setup_schema(schema).await;
+        let client = setup_schema(schema).await;
 
         let mut connector = test_connector();
         let object = connector
@@ -1159,7 +1159,7 @@ mod integration_tests {
     #[tokio::test]
     async fn get_objects_returns_complete_schema_contents() {
         let schema = "connector_impl_full_schema";
-        let mut client = setup_schema(schema).await;
+        let client = setup_schema(schema).await;
         client
             .batch_execute(&format!(
                 r#"
