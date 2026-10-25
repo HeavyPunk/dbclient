@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
-use tokio_postgres::NoTls;
+use tokio_postgres::{NoTls, Row};
 
 use crate::core::{
     dbclient::connector::{
@@ -11,7 +11,10 @@ use crate::core::{
     },
     proto::{
         self,
-        postgresql::{PostgresObjectDescriptor, PostgresRecord, PostgresTableDescriptor},
+        postgresql::{
+            postgres_field::Field, PostgresObjectDescriptor, PostgresRecord,
+            PostgresTableDescriptor,
+        },
     },
 };
 
@@ -23,65 +26,271 @@ pub struct PostgresConnector {
     pub config: PostgresConfig,
 }
 
-impl proto::postgresql::DbField {
-    fn from_pg_type(type_name: &str) -> Self {
+impl proto::postgresql::PostgresField {
+    pub fn into_pg_type(&self) -> Option<&'static str> {
+        match &self.field {
+            Some(proto::postgresql::postgres_field::Field::Unsupported(_)) => Some("unsupported"),
+            Some(proto::postgresql::postgres_field::Field::Bigint(_)) => Some("bigint"),
+            Some(proto::postgresql::postgres_field::Field::Bigserial(_)) => Some("bigserial"),
+            Some(proto::postgresql::postgres_field::Field::DoublePrecision(_)) => {
+                Some("double precision")
+            }
+            Some(proto::postgresql::postgres_field::Field::Integer(_)) => Some("integer"),
+            Some(proto::postgresql::postgres_field::Field::Numeric(_)) => Some("numeric"),
+            Some(proto::postgresql::postgres_field::Field::Real(_)) => Some("real"),
+            Some(proto::postgresql::postgres_field::Field::Smallint(_)) => Some("smallint"),
+            Some(proto::postgresql::postgres_field::Field::Smallserial(_)) => Some("smallserial"),
+            Some(proto::postgresql::postgres_field::Field::Serial(_)) => Some("serial"),
+            Some(proto::postgresql::postgres_field::Field::Bit(_)) => Some("bit"),
+            Some(proto::postgresql::postgres_field::Field::Varbit(_)) => Some("varbit"),
+            Some(proto::postgresql::postgres_field::Field::Char(_)) => Some("char"),
+            Some(proto::postgresql::postgres_field::Field::Varchar(_)) => Some("varchar"),
+            Some(proto::postgresql::postgres_field::Field::Text(_)) => Some("text"),
+            Some(proto::postgresql::postgres_field::Field::Bytea(_)) => Some("bytea"),
+            Some(proto::postgresql::postgres_field::Field::Date(_)) => Some("date"),
+            Some(proto::postgresql::postgres_field::Field::Time(_)) => Some("time"),
+            Some(proto::postgresql::postgres_field::Field::Timetz(_)) => Some("timetz"),
+            Some(proto::postgresql::postgres_field::Field::Timestamp(_)) => Some("timestamp"),
+            Some(proto::postgresql::postgres_field::Field::Timestamptz(_)) => Some("timestamptz"),
+            Some(proto::postgresql::postgres_field::Field::Interval(_)) => Some("interval"),
+            Some(proto::postgresql::postgres_field::Field::Boolean(_)) => Some("boolean"),
+            Some(proto::postgresql::postgres_field::Field::Money(_)) => Some("money"),
+            Some(proto::postgresql::postgres_field::Field::Cidr(_)) => Some("cidr"),
+            Some(proto::postgresql::postgres_field::Field::Inet(_)) => Some("inet"),
+            Some(proto::postgresql::postgres_field::Field::Box(_)) => Some("box"),
+            Some(proto::postgresql::postgres_field::Field::Circle(_)) => Some("circle"),
+            Some(proto::postgresql::postgres_field::Field::Line(_)) => Some("line"),
+            Some(proto::postgresql::postgres_field::Field::Lseg(_)) => Some("lseg"),
+            Some(proto::postgresql::postgres_field::Field::Path(_)) => Some("path"),
+            Some(proto::postgresql::postgres_field::Field::Point(_)) => Some("point"),
+            Some(proto::postgresql::postgres_field::Field::Polygon(_)) => Some("polygon"),
+            Some(proto::postgresql::postgres_field::Field::Json(_)) => Some("json"),
+            Some(proto::postgresql::postgres_field::Field::Jsonb(_)) => Some("jsonb"),
+            Some(proto::postgresql::postgres_field::Field::Tsquery(_)) => Some("tsquery"),
+            Some(proto::postgresql::postgres_field::Field::Tsvector(_)) => Some("tsvector"),
+            Some(proto::postgresql::postgres_field::Field::Uuid(_)) => Some("uuid"),
+            Some(proto::postgresql::postgres_field::Field::Xml(_)) => Some("xml"),
+            None => None,
+        }
+    }
+
+    fn from_pg_type(type_name: &str, row: Option<&Row>, column_name: Option<&str>) -> Self {
+        macro_rules! value {
+            ($type:ty) => {
+                match (row, column_name) {
+                    (Some(row), Some(column_name)) => {
+                        row.try_get::<_, Option<$type>>(column_name).ok().flatten()
+                    }
+                    _ => None,
+                }
+            };
+        }
+
         let field = match type_name {
-            "bool" => Some(proto::postgresql::db_field::Field::Boolean(
-                proto::postgresql::Boolean { boolean: None },
-            )),
-            "int2" => Some(proto::postgresql::db_field::Field::I16(
-                proto::postgresql::Int16 { i16: None },
-            )),
-            "int4" => Some(proto::postgresql::db_field::Field::I32(
-                proto::postgresql::Int32 { i32: None },
-            )),
-            "int8" => Some(proto::postgresql::db_field::Field::I64(
-                proto::postgresql::Int64 { i64: None },
-            )),
-            "varchar" | "text" => Some(proto::postgresql::db_field::Field::Str(
-                proto::postgresql::String { str: None },
-            )),
-            "timestamptz" => Some(proto::postgresql::db_field::Field::Datetime(
-                proto::postgresql::Timestamp { datetime: None },
-            )),
-            _ => None,
+            "bigint" | "int8" => Some(Field::Bigint(proto::postgresql::Bigint {
+                bigint: value!(i64),
+            })),
+            "bigserial" | "serial8" => Some(Field::Bigserial(proto::postgresql::Bigserial {
+                bigserial: value!(i64),
+            })),
+            "double precision" | "float8" => {
+                Some(Field::DoublePrecision(proto::postgresql::DoublePrecision {
+                    double_precision: value!(f64),
+                }))
+            }
+            "integer" | "int4" | "int" => Some(Field::Integer(proto::postgresql::Integer {
+                integer: value!(i32),
+            })),
+            "numeric" | "decimal" => Some(Field::Numeric(proto::postgresql::Numeric {
+                numeric: value!(String),
+            })),
+            "real" | "float4" => Some(Field::Real(proto::postgresql::Real { real: value!(f32) })),
+            "smallint" | "int2" => Some(Field::Smallint(proto::postgresql::Smallint {
+                smallint: value!(i16).map(i32::from),
+            })),
+            "smallserial" | "serial2" => Some(Field::Smallserial(proto::postgresql::Smallserial {
+                smallserial: value!(i32),
+            })),
+            "serial" | "serial4" => Some(Field::Serial(proto::postgresql::Serial {
+                serial: value!(i32),
+            })),
+            "bit" => Some(Field::Bit(proto::postgresql::Bit {
+                bit: value!(String),
+            })),
+            "varbit" => Some(Field::Varbit(proto::postgresql::Varbit {
+                varbit: value!(String),
+            })),
+            "char" | "character" | "bpchar" => Some(Field::Char(proto::postgresql::Char {
+                r#char: value!(String),
+            })),
+            "varchar" | "character varying" => Some(Field::Varchar(proto::postgresql::Varchar {
+                varchar: value!(String),
+            })),
+            "text" => Some(Field::Text(proto::postgresql::Text {
+                text: value!(String),
+            })),
+            "bytea" => Some(Field::Bytea(proto::postgresql::Bytea {
+                bytea: value!(Vec<u8>),
+            })),
+            "date" => Some(Field::Date(proto::postgresql::Date {
+                date: value!(String),
+            })),
+            "time" | "time without time zone" => Some(Field::Time(proto::postgresql::Time {
+                time: value!(String),
+            })),
+            "timetz" | "time with time zone" => Some(Field::Timetz(proto::postgresql::Timetz {
+                timetz: value!(String),
+            })),
+            "timestamp" | "timestamp without time zone" => {
+                Some(Field::Timestamp(proto::postgresql::Timestamp {
+                    datetime: match value!(String) {
+                        Some(value) => DateTime::parse_from_str(
+                            &format!("{value} UTC"),
+                            "%Y-%m-%d %H:%M:%S%.f %Z",
+                        )
+                        .ok()
+                        .map(|value| Timestamp {
+                            seconds: value.timestamp(),
+                            nanos: value.timestamp_subsec_nanos() as i32,
+                        }),
+                        None => None,
+                    },
+                }))
+            }
+            "timestamptz" | "timestamp with time zone" => {
+                Some(Field::Timestamptz(proto::postgresql::Timestamptz {
+                    timestamptz: value!(std::time::SystemTime).map(|value| {
+                        let value: DateTime<Utc> = value.into();
+                        Timestamp {
+                            seconds: value.timestamp(),
+                            nanos: value.timestamp_subsec_nanos() as i32,
+                        }
+                    }),
+                }))
+            }
+            "interval" => Some(Field::Interval(proto::postgresql::Interval {
+                interval: value!(String),
+            })),
+            "bool" | "boolean" => Some(Field::Boolean(proto::postgresql::Boolean {
+                boolean: value!(bool),
+            })),
+            "money" => Some(Field::Money(proto::postgresql::Money {
+                money: value!(String),
+            })),
+            "cidr" => Some(Field::Cidr(proto::postgresql::Cidr {
+                cidr: value!(String),
+            })),
+            "inet" => Some(Field::Inet(proto::postgresql::Inet {
+                inet: value!(String),
+            })),
+            "box" => Some(Field::Box(proto::postgresql::Box {
+                r#box: value!(String),
+            })),
+            "circle" => Some(Field::Circle(proto::postgresql::Circle {
+                circle: value!(String),
+            })),
+            "line" => Some(Field::Line(proto::postgresql::Line {
+                line: value!(String),
+            })),
+            "lseg" => Some(Field::Lseg(proto::postgresql::Lseg {
+                lseg: value!(String),
+            })),
+            "path" => Some(Field::Path(proto::postgresql::Path {
+                path: value!(String),
+            })),
+            "point" => Some(Field::Point(proto::postgresql::Point {
+                point: value!(String),
+            })),
+            "polygon" => Some(Field::Polygon(proto::postgresql::Polygon {
+                polygon: value!(String),
+            })),
+            "json" => Some(Field::Json(proto::postgresql::Json {
+                json: value!(String),
+            })),
+            "jsonb" => Some(Field::Jsonb(proto::postgresql::Jsonb {
+                jsonb: value!(String),
+            })),
+            "tsquery" => Some(Field::Tsquery(proto::postgresql::Tsquery {
+                tsquery: value!(String),
+            })),
+            "tsvector" => Some(Field::Tsvector(proto::postgresql::Tsvector {
+                tsvector: value!(String),
+            })),
+            "uuid" => Some(Field::Uuid(proto::postgresql::Uuid {
+                uuid: value!(String),
+            })),
+            "xml" => Some(Field::Xml(proto::postgresql::Xml {
+                xml: value!(String),
+            })),
+            _ => Some(Field::Unsupported(proto::postgresql::Unsupported {
+                value: value!(String).or_else(|| Some(type_name.to_owned())),
+            })),
         };
 
         Self { field }
     }
 
     fn into_sql_value(&self) -> Option<String> {
+        fn quote(value: &str) -> String {
+            format!("'{}'", value.replace('\'', "''"))
+        }
+
+        fn quote_timestamp(timestamp: &Timestamp) -> Option<String> {
+            DateTime::<Utc>::from_timestamp(timestamp.seconds, timestamp.nanos as u32)
+                .map(|datetime| quote(&datetime.to_rfc3339()))
+        }
+
         match &self.field {
-            Some(proto::postgresql::db_field::Field::Str(proto::postgresql::String {
-                str: Some(s),
-            })) => Some(format!("'{s}'")),
-            Some(proto::postgresql::db_field::Field::StrContainer(
-                proto::postgresql::StringContainer { strs },
-            )) => {
-                let s = strs.join("\n");
-                Some(format!("'{s}'"))
+            Some(Field::Unsupported(value)) => value.value.as_deref().map(quote),
+            Some(Field::Bigint(value)) => value.bigint.map(|value| value.to_string()),
+            Some(Field::Bigserial(value)) => value.bigserial.map(|value| value.to_string()),
+            Some(Field::DoublePrecision(value)) => {
+                value.double_precision.map(|value| value.to_string())
             }
-            Some(proto::postgresql::db_field::Field::I8(proto::postgresql::Int8 {
-                i8: Some(i8),
-            })) => Some(i8.to_string()),
-            Some(proto::postgresql::db_field::Field::I16(proto::postgresql::Int16 {
-                i16: Some(i16),
-            })) => Some(i16.to_string()),
-            Some(proto::postgresql::db_field::Field::I32(proto::postgresql::Int32 {
-                i32: Some(i32),
-            })) => Some(i32.to_string()),
-            Some(proto::postgresql::db_field::Field::I64(proto::postgresql::Int64 {
-                i64: Some(i64),
-            })) => Some(i64.to_string()),
-            Some(proto::postgresql::db_field::Field::Boolean(proto::postgresql::Boolean {
-                boolean: Some(b),
-            })) => Some(b.to_string()),
-            Some(proto::postgresql::db_field::Field::Datetime(proto::postgresql::Timestamp {
-                datetime: Some(timestamp),
-            })) => {
-                let s = timestamp.to_string();
-                Some(format!("'{s}'"))
-            }
+            Some(Field::Integer(value)) => value.integer.map(|value| value.to_string()),
+            Some(Field::Numeric(value)) => value.numeric.as_deref().map(str::to_owned),
+            Some(Field::Real(value)) => value.real.map(|value| value.to_string()),
+            Some(Field::Smallint(value)) => value.smallint.map(|value| value.to_string()),
+            Some(Field::Smallserial(value)) => value.smallserial.map(|value| value.to_string()),
+            Some(Field::Serial(value)) => value.serial.map(|value| value.to_string()),
+
+            Some(Field::Bit(value)) => value.bit.as_deref().map(quote),
+            Some(Field::Varbit(value)) => value.varbit.as_deref().map(quote),
+            Some(Field::Char(value)) => value.r#char.as_deref().map(quote),
+            Some(Field::Varchar(value)) => value.varchar.as_deref().map(quote),
+            Some(Field::Text(value)) => value.text.as_deref().map(quote),
+            Some(Field::Bytea(value)) => value.bytea.as_deref().map(|bytes| {
+                let hex = bytes
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>();
+                quote(&format!("\\x{hex}"))
+            }),
+
+            Some(Field::Date(value)) => value.date.as_deref().map(quote),
+            Some(Field::Time(value)) => value.time.as_deref().map(quote),
+            Some(Field::Timetz(value)) => value.timetz.as_deref().map(quote),
+            Some(Field::Timestamp(value)) => value.datetime.as_ref().and_then(quote_timestamp),
+            Some(Field::Timestamptz(value)) => value.timestamptz.as_ref().and_then(quote_timestamp),
+            Some(Field::Interval(value)) => value.interval.as_deref().map(quote),
+
+            Some(Field::Boolean(value)) => value.boolean.map(|value| value.to_string()),
+            Some(Field::Money(value)) => value.money.as_deref().map(quote),
+            Some(Field::Cidr(value)) => value.cidr.as_deref().map(quote),
+            Some(Field::Inet(value)) => value.inet.as_deref().map(quote),
+            Some(Field::Box(value)) => value.r#box.as_deref().map(quote),
+            Some(Field::Circle(value)) => value.circle.as_deref().map(quote),
+            Some(Field::Line(value)) => value.line.as_deref().map(quote),
+            Some(Field::Lseg(value)) => value.lseg.as_deref().map(quote),
+            Some(Field::Path(value)) => value.path.as_deref().map(quote),
+            Some(Field::Point(value)) => value.point.as_deref().map(quote),
+            Some(Field::Polygon(value)) => value.polygon.as_deref().map(quote),
+            Some(Field::Json(value)) => value.json.as_deref().map(quote),
+            Some(Field::Jsonb(value)) => value.jsonb.as_deref().map(quote),
+            Some(Field::Tsquery(value)) => value.tsquery.as_deref().map(quote),
+            Some(Field::Tsvector(value)) => value.tsvector.as_deref().map(quote),
+            Some(Field::Uuid(value)) => value.uuid.as_deref().map(quote),
+            Some(Field::Xml(value)) => value.xml.as_deref().map(quote),
             _ => None,
         }
     }
@@ -277,8 +486,10 @@ impl Connector for PostgresConnector {
                                 .into_iter()
                                 .map(|(name, type_name)| proto::postgresql::PostgresTableColumn {
                                     name,
-                                    field: Some(proto::postgresql::DbField::from_pg_type(
+                                    field: Some(proto::postgresql::PostgresField::from_pg_type(
                                         type_name.as_str(),
+                                        None,
+                                        None,
                                     )),
                                 })
                                 .collect(),
@@ -525,71 +736,11 @@ impl Connector for PostgresConnector {
                 for column in columns {
                     let name = column.name();
                     let column_type_name = column.type_().name();
-                    let value =
-                        match column_type_name {
-                            "bool" => {
-                                let value: Option<bool> = row.try_get(name)?;
-                                proto::postgresql::DbField {
-                                    field: Some(proto::postgresql::db_field::Field::Boolean(
-                                        proto::postgresql::Boolean { boolean: value },
-                                    )),
-                                }
-                            }
-                            "int2" => {
-                                let value: Option<i16> = row.try_get(name)?;
-                                proto::postgresql::DbField {
-                                    field: Some(proto::postgresql::db_field::Field::I16(
-                                        proto::postgresql::Int16 {
-                                            i16: value.map(|v| v as i32),
-                                        },
-                                    )),
-                                }
-                            }
-                            "int4" => {
-                                let value: Option<i32> = row.try_get(name)?;
-                                proto::postgresql::DbField {
-                                    field: Some(proto::postgresql::db_field::Field::I32(
-                                        proto::postgresql::Int32 { i32: value },
-                                    )),
-                                }
-                            }
-                            "int8" => {
-                                let value: Option<i64> = row.try_get(name)?;
-                                proto::postgresql::DbField {
-                                    field: Some(proto::postgresql::db_field::Field::I64(
-                                        proto::postgresql::Int64 { i64: value },
-                                    )),
-                                }
-                            }
-                            "varchar" => {
-                                let value: Option<String> = row.try_get(name)?;
-                                proto::postgresql::DbField {
-                                    field: Some(proto::postgresql::db_field::Field::Str(
-                                        proto::postgresql::String { str: value },
-                                    )),
-                                }
-                            }
-                            "timestamptz" => {
-                                let value: std::time::SystemTime = row.try_get(name)?;
-                                let datetime: DateTime<Utc> = value.into();
-                                proto::postgresql::DbField {
-                                    field: Some(proto::postgresql::db_field::Field::Datetime(
-                                        proto::postgresql::Timestamp {
-                                            datetime: Some(Timestamp {
-                                                seconds: datetime.timestamp(),
-                                                // TODO: also map nanos
-                                                ..Default::default()
-                                            }),
-                                        },
-                                    )),
-                                }
-                            }
-                            _ => return Err(
-                                crate::core::dbclient::connector::ConnectorError::InvalidRequest(
-                                    "[postgresql] failed to map value",
-                                ),
-                            ),
-                        };
+                    let value = proto::postgresql::PostgresField::from_pg_type(
+                        column_type_name,
+                        Some(&row),
+                        Some(name),
+                    );
                     proto_row.values.push(value);
                 }
                 proto_rows.push(proto_row);
@@ -603,9 +754,11 @@ impl Connector for PostgresConnector {
                                     .iter()
                                     .map(|column| proto::postgresql::PostgresTableColumn {
                                         name: column.0.clone(),
-                                        field: Some(proto::postgresql::DbField::from_pg_type(
-                                            &column.1,
-                                        )),
+                                        field: Some(
+                                            proto::postgresql::PostgresField::from_pg_type(
+                                                &column.1, None, None,
+                                            ),
+                                        ),
                                     })
                                     .collect(),
                                 rows: proto_rows,
@@ -1034,7 +1187,11 @@ async fn load_table_object(
             let type_name: String = row.get(1);
             proto::postgresql::PostgresTableColumn {
                 name: row.get(0),
-                field: Some(proto::postgresql::DbField::from_pg_type(type_name.as_str())),
+                field: Some(proto::postgresql::PostgresField::from_pg_type(
+                    type_name.as_str(),
+                    None,
+                    None,
+                )),
             }
         })
         .collect();

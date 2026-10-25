@@ -167,9 +167,7 @@ pub fn FileTree<T: Clone + Send + Sync + 'static>(
                         return;
                     };
                     if let Ok(mut callback) = callback.lock() {
-                        callback(FileTreeContext {
-                            descriptor,
-                        });
+                        callback(FileTreeContext { descriptor });
                     }
                 }
             }

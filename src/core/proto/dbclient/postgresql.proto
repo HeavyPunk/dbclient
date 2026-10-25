@@ -18,7 +18,7 @@ message PostgresRecordTable {
 }
 
 message PostgresRecordTableRow {
-  repeated DbField values = 1;
+  repeated PostgresField values = 1;
 }
 
 message PostgresObject {
@@ -74,7 +74,7 @@ message PostgresTableDescriptor {
 message PostgresTableColumn {
   string name = 1;
   // field type descriptor, contains useless value
-  DbField field = 2;
+  PostgresField field = 2;
 }
 
 message PostgresTableConstrain {
@@ -102,49 +102,221 @@ message PostgresType {
 }
 
 
-
-
-message DbField {
+message PostgresField {
+  // PostgreSQL built-in data types. Values that do not have a native protobuf
+  // scalar representation are transported as their textual representation.
   oneof field {
-    String str = 1;
-    StringContainer str_container = 2;
-    Int8 i8 = 3;
-    Int16 i16 = 4;
-    Int32 i32 = 5;
-    Int64 i64 = 6;
-    Boolean boolean = 7;
-    Timestamp datetime = 8;
+    // User-defined or unsupported PostgreSQL type
+    Unsupported unsupported = 1;
+
+    // Numeric types
+    Bigint bigint = 2;
+    Bigserial bigserial = 3;
+    DoublePrecision double_precision = 4;
+    Integer integer = 5;
+    Numeric numeric = 6;
+    Real real = 7;
+    Smallint smallint = 8;
+    Smallserial smallserial = 9;
+    Serial serial = 10;
+
+    // Bit string types
+    Bit bit = 11;
+    Varbit varbit = 12;
+
+    // Character and binary string types
+    Char char = 13;
+    Varchar varchar = 14;
+    Text text = 15;
+    Bytea bytea = 16;
+
+    // Date and time types
+    Date date = 17;
+    Time time = 18;
+    Timetz timetz = 19;
+    Timestamp timestamp = 20;
+    Timestamptz timestamptz = 21;
+    Interval interval = 22;
+
+    // Boolean and monetary types
+    Boolean boolean = 23;
+    Money money = 24;
+
+    // Network address types
+    Cidr cidr = 25;
+    Inet inet = 26;
+
+    // Geometric types
+    Box box = 27;
+    Circle circle = 28;
+    Line line = 29;
+    Lseg lseg = 30;
+    Path path = 31;
+    Point point = 32;
+    Polygon polygon = 33;
+
+    // JSON, XML, full-text search and identifier types
+    Json json = 34;
+    Jsonb jsonb = 35;
+    Tsquery tsquery = 36;
+    Tsvector tsvector = 37;
+    Uuid uuid = 38;
+    Xml xml = 39;
   }
 }
 
-message String {
-  optional string str = 1;
-}
-
-message StringContainer {
-  repeated string strs = 1;
-}
-
-message Int8 {
-  optional int32 i8 = 1;
-}
-
-message Int16 {
-  optional int32 i16 = 1;
-}
-
-message Int32 {
-  optional int32 i32 = 1;
-}
-
-message Int64 {
-  optional int64 i64 = 1;
+message Unsupported {
+  optional string value = 1;
 }
 
 message Boolean {
   optional bool boolean = 1;
 }
 
+message Bigint {
+  optional int64 bigint = 1;
+}
+
+message Bigserial {
+  optional int64 bigserial = 1;
+}
+
+message Bit {
+  optional string bit = 1;
+}
+
+message Varbit {
+  optional string varbit = 1;
+}
+
+message Char {
+  optional string char = 1;
+}
+
+message Varchar {
+  optional string varchar = 1;
+}
+
+message Text {
+  optional string text = 1;
+}
+
+message Bytea {
+  optional bytes bytea = 1;
+}
+
+message Date {
+  optional string date = 1;
+}
+
+message Time {
+  optional string time = 1;
+}
+
+message Timetz {
+  optional string timetz = 1;
+}
+
+message Timestamptz {
+  optional google.protobuf.Timestamp timestamptz = 1;
+}
+
 message Timestamp {
   optional google.protobuf.Timestamp datetime = 1;
+}
+
+message Interval {
+  optional string interval = 1;
+}
+
+message DoublePrecision {
+  optional double double_precision = 1;
+}
+
+message Integer {
+  optional int32 integer = 1;
+}
+
+message Numeric {
+  optional string numeric = 1;
+}
+
+message Real {
+  optional float real = 1;
+}
+
+message Smallint {
+  optional int32 smallint = 1;
+}
+
+message Smallserial {
+  optional int32 smallserial = 1;
+}
+
+message Serial {
+  optional int32 serial = 1;
+}
+
+message Money {
+  optional string money = 1;
+}
+
+message Cidr {
+  optional string cidr = 1;
+}
+
+message Inet {
+  optional string inet = 1;
+}
+
+message Box {
+  optional string box = 1;
+}
+
+message Circle {
+  optional string circle = 1;
+}
+
+message Line {
+  optional string line = 1;
+}
+
+message Lseg {
+  optional string lseg = 1;
+}
+
+message Path {
+  optional string path = 1;
+}
+
+message Point {
+  optional string point = 1;
+}
+
+message Polygon {
+  optional string polygon = 1;
+}
+
+message Json {
+  optional string json = 1;
+}
+
+message Jsonb {
+  optional string jsonb = 1;
+}
+
+message Tsquery {
+  optional string tsquery = 1;
+}
+
+message Tsvector {
+  optional string tsvector = 1;
+}
+
+message Uuid {
+  optional string uuid = 1;
+}
+
+message Xml {
+  optional string xml = 1;
 }

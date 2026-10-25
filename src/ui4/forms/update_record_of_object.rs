@@ -89,7 +89,7 @@ pub fn UpdateRecordOfObject(
                             return false;
                         };
                         let Ok(new_field) =
-                            crate::ui4::forms::add_record_to_object::field_from_string(
+                            proto::common::db_field::Field::field_from_string(
                                 &field.draft,
                                 initial_field,
                             )
@@ -285,11 +285,13 @@ fn record_fields(record: &proto::common::DbRecord) -> Vec<RecordField> {
                 .field
                 .as_ref()
                 .map(|field| {
-                    crate::ui4::forms::add_record_to_object::field_into_string(
-                        &proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
+                    let f: Option<String> = proto::common::db_field::Field::Postgres(
+                        proto::postgresql::PostgresField {
                             field: Some(field.clone()),
-                        }),
+                        },
                     )
+                    .into();
+                    f.unwrap_or_default()
                 })
                 .unwrap_or_default(),
         })
@@ -312,7 +314,7 @@ fn fields_into_record(
                     .iter()
                     .map(|field| match field.value.field.as_ref() {
                         Some(proto::common::db_field::Field::Postgres(value)) => value.clone(),
-                        None => proto::postgresql::DbField::default(),
+                        None => proto::postgresql::PostgresField::default(),
                     })
                     .collect();
             }
@@ -322,34 +324,8 @@ fn fields_into_record(
 }
 
 pub fn field_type_into_string(field: &proto::common::DbField) -> Option<&'static str> {
-    match field.field {
-        Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: Some(proto::postgresql::db_field::Field::I8(_)),
-        })) => Some("int8"),
-        Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: Some(proto::postgresql::db_field::Field::I16(_)),
-        })) => Some("int16"),
-        Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: Some(proto::postgresql::db_field::Field::I32(_)),
-        })) => Some("int32"),
-        Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: Some(proto::postgresql::db_field::Field::I64(_)),
-        })) => Some("int64"),
-        Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: Some(proto::postgresql::db_field::Field::Str(_)),
-        })) => Some("string"),
-        Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: Some(proto::postgresql::db_field::Field::StrContainer(_)),
-        })) => Some("text"),
-        Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: Some(proto::postgresql::db_field::Field::Boolean(_)),
-        })) => Some("bool"),
-        Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: Some(proto::postgresql::db_field::Field::Datetime(_)),
-        })) => Some("datetime"),
-        None
-        | Some(proto::common::db_field::Field::Postgres(proto::postgresql::DbField {
-            field: None,
-        })) => None,
+    match &field.field {
+        Some(proto::common::db_field::Field::Postgres(pg_field)) => pg_field.into_pg_type(),
+        None => None,
     }
 }

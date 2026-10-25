@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-fn postgres_field_from_common(field: &Field) -> proto::postgresql::DbField {
+fn postgres_field_from_common(field: &Field) -> proto::postgresql::PostgresField {
     match field {
         Field::Postgres(field) => field.clone(),
     }
@@ -178,7 +178,7 @@ pub fn QueryResult(
                                             element! {
                                                 TableView(
                                                     columns: table.columns.iter().map(|column| column.name.clone()).collect::<Vec<_>>(),
-                                                    rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone().map(|field| Field::Postgres(proto::postgresql::DbField { field: Some(field) }))).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
+                                                    rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone().map(|field| Field::Postgres(proto::postgresql::PostgresField { field: Some(field) }))).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
                                                     has_focus: tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult),
                                                     on_add_row: Some(table_event_handler(move |_, _| {
                                                         let mut state_guard = tokio::task::block_in_place(|| table_callback_state_on_add.blocking_lock());

@@ -13,17 +13,15 @@ use crate::core::proto::queries::{
     RemoveRecordFromObjectRequest, RemoveRecordFromObjectResponse, UpdateRecordOfObjectRequest,
     UpdateRecordOfObjectResponse,
 };
-use crate::core::
-    proto::{
-        self,
-        common::DbObject,
-        connections::{GetAvailableConnectionsRequest, GetAvailableConnectionsResponse},
-        objects::{
-            AddObjectToConnectionRequest, AddObjectToConnectionResponse,
-            GetObjectsOfConnectionRequest, GetObjectsOfConnectionResponse,
-        },
-    }
-;
+use crate::core::proto::{
+    self,
+    common::DbObject,
+    connections::{GetAvailableConnectionsRequest, GetAvailableConnectionsResponse},
+    objects::{
+        AddObjectToConnectionRequest, AddObjectToConnectionResponse, GetObjectsOfConnectionRequest,
+        GetObjectsOfConnectionResponse,
+    },
+};
 
 pub struct ConnectionsServer {
     conns: Vec<Connection>,
