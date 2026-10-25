@@ -277,7 +277,7 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use crate::hotkey_manager::{Graph, GraphCallback, GraphNode, HotKeyError};
+    use crate::hotkey_manager::HotKeyError;
 
     type TestCallback = fn(&mut ()) -> Result<(), HotKeyError>;
 
@@ -289,7 +289,7 @@ mod tests {
         use std::marker::PhantomData;
 
         use super::{noop, TestCallback};
-        use crate::hotkey_manager::{Graph, GraphCallback, GraphNode, HotKeyError};
+        use crate::hotkey_manager::{Graph, GraphNode, HotKeyError};
 
         fn assert_graph(
             expected: &Graph<char, (), (), TestCallback>,

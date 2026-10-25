@@ -27,6 +27,6 @@ message DbObjectDescriptor {
 
 message DbField {
   oneof field {
-    postgresql.DbField postgres = 1;
+    postgresql.PostgresField postgres = 1;
   }
 }

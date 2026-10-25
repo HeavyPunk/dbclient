@@ -14,7 +14,6 @@ use tokio::sync::Mutex as TokioMutex;
 
 #[derive(Clone, Debug)]
 pub struct FileTreeContext<T> {
-    pub path: Vec<String>,
     pub descriptor: T,
 }
 
@@ -168,10 +167,7 @@ pub fn FileTree<T: Clone + Send + Sync + 'static>(
                         return;
                     };
                     if let Ok(mut callback) = callback.lock() {
-                        callback(FileTreeContext {
-                            path: node.path.clone(),
-                            descriptor,
-                        });
+                        callback(FileTreeContext { descriptor });
                     }
                 }
             }
