@@ -95,6 +95,7 @@ pub fn CustomQuery(props: &CustomQueryProps, mut hooks: Hooks) -> impl Into<AnyE
             }
             View(
                 width: 100pct,
+                background_color: Color::DarkGrey,
             ) {
                 TextInput(
                     has_focus: is_focused.get(),
