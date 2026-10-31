@@ -18,7 +18,7 @@ use crate::{
         app_state::{AppState, Page, QueryResultCmd},
         components::table_view::{table_event_handler, TableView},
         forms::{
-            add_record_to_object::AddRecordToObjectForm,
+            add_record_to_object::AddRecordToObjectForm, custom_query::CustomQuery,
             update_record_of_object::UpdateRecordOfObject,
         },
     },
@@ -34,6 +34,7 @@ fn postgres_field_from_common(field: &Field) -> proto::postgresql::PostgresField
 enum Popup {
     AddRecordToObject(bool),
     UpdateRecordOfObject(proto::common::DbRecord),
+    CustomQuery,
 }
 
 #[derive(Default, Props)]
@@ -80,6 +81,7 @@ pub fn QueryResult(
                 &cmd,
                 &state,
                 &queries_client,
+                &db_object_client,
                 &mut to_visualize,
                 &mut render_popup,
                 &mut selected_object,
@@ -92,41 +94,6 @@ pub fn QueryResult(
                 } else {
                     log::warn!("Error on performing cmd: {e}")
                 }
-            }
-        }
-    });
-
-    let state_for_add_add_record_to_object_widget = props.state.clone();
-    hooks.use_future(async move {
-        loop {
-            tokio::time::sleep(Duration::from_millis(50)).await;
-            let popup = {
-                let r = render_popup.read();
-                r.clone()
-            };
-            match popup {
-                Some(Popup::AddRecordToObject(is_data_loaded)) if !is_data_loaded => {
-                    let state = state_for_add_add_record_to_object_widget.lock().await;
-                    match &db_object_client {
-                        Some(cli) => {
-                            let obj = cli
-                                .get_object_of_decriptor(
-                                    proto::objects::GetObjectOfDecriptorRequest {
-                                        connection: state.selected_connection.clone(),
-                                        descriptor: state.selected_object.clone(),
-                                    },
-                                )
-                                .await;
-                            match obj {
-                                Ok(r) => selected_object.set(r.object),
-                                Err(e) => log::error!(target: "query_result", "Error on get object of descriptor: {e}")
-                            };
-                        }
-                        None => {}
-                    };
-                    render_popup.set(Some(Popup::AddRecordToObject(true)));
-                }
-                _ => {}
             }
         }
     });
@@ -147,6 +114,10 @@ pub fn QueryResult(
         match code {
             KeyCode::Char('h') => {
                 state.focus_widget = crate::ui4::app_state::Widget::DbObjects;
+            }
+            KeyCode::Char('q') => {
+                render_popup.set(Some(Popup::CustomQuery));
+                state.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
             }
             KeyCode::Esc => {
                 state.selected_page = Page::ConnectionsList;
@@ -172,8 +143,8 @@ pub fn QueryResult(
                                 #(
                                     match postgres_record.record.as_ref() {
                                         Some(proto::postgresql::postgres_record::Record::Table(table)) => {
-                                            let table_callback_state_on_add = props.state.clone();
                                             let table_callback_state_on_update = props.state.clone();
+                                            let cmd_sender_on_add = props.cmd_pipe.clone();
                                             let cmd_sender = props.cmd_pipe.clone();
                                             element! {
                                                 TableView(
@@ -181,9 +152,7 @@ pub fn QueryResult(
                                                     rows: table.rows.iter().map(|row| row.values.iter().filter_map(|value| value.field.clone().map(|field| Field::Postgres(proto::postgresql::PostgresField { field: Some(field) }))).collect::<Vec<Field>>()).collect::<Vec<Vec<Field>>>(),
                                                     has_focus: tokio::task::block_in_place(|| props.state.blocking_lock().focus_widget == crate::ui4::app_state::Widget::QueryResult),
                                                     on_add_row: Some(table_event_handler(move |_, _| {
-                                                        let mut state_guard = tokio::task::block_in_place(|| table_callback_state_on_add.blocking_lock());
-                                                        render_popup.set(Some(Popup::AddRecordToObject(false)));
-                                                        state_guard.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
+                                                        tokio::task::block_in_place(|| cmd_sender_on_add.as_ref().and_then(|ch| Some(ch.blocking_send(QueryResultCmd::OpenAddRecordPopup))));
                                                     })),
                                                     on_update_row: Some(table_event_handler(move |columns, row| {
                                                         let mut state_guard = tokio::task::block_in_place(|| table_callback_state_on_update.blocking_lock());
@@ -271,6 +240,22 @@ pub fn QueryResult(
                                 )
                             }
                         }
+                    },
+                    (Some(Popup::CustomQuery), _) => {
+                        element! {
+                            View(
+                                position: Position::Absolute,
+                                width: 70pct,
+                                height: 50pct,
+                                top: 8,
+                                left: 4,
+                                background_color: Color::Black,
+                            ) {
+                                CustomQuery(
+                                    cmd_pipe: props.cmd_pipe.clone(),
+                                )
+                            }
+                        }
                     }
                     _ => {
                         element! {
@@ -287,14 +272,55 @@ async fn run_cmd(
     cmd: &Option<QueryResultCmd>,
     state: &Mutex<AppState>,
     queries_client: &Option<Arc<dyn proto::queries::QueriesService + Send + Sync>>,
+    objects_client: &Option<Arc<dyn proto::objects::ObjectsService + Send + Sync>>,
     to_visualize: &mut State<DbRecord>,
     render_popup: &mut State<Option<Popup>>,
     selected_object: &mut State<Option<proto::common::DbObject>>,
     self_cmd_sender: &tokio::sync::mpsc::Sender<QueryResultCmd>,
 ) -> anyhow::Result<()> {
     return match cmd {
-        Some(QueryResultCmd::ExecuteRawQuery) => {
-            Err(anyhow::anyhow!("operation not yet implemented"))
+        Some(QueryResultCmd::ExecuteRawQuery(query)) => {
+            let connection = {
+                let state = state.lock().await;
+                state.selected_connection.clone()
+            };
+            match (&queries_client, &connection) {
+                (Some(client), Some(connection)) => {
+                    match client
+                        .execute_raw_query(proto::queries::ExecuteRawQueryRequest {
+                            connection: Some(connection.clone()),
+                            query: query.clone(),
+                        })
+                        .await
+                    {
+                        Ok(resp) => {
+                            match resp.result {
+                                Some(proto::queries::QueryResult {
+                                    result:
+                                        Some(proto::queries::query_result::Result::Status(status)),
+                                }) => {
+                                    log::warn!("{}", status);
+                                }
+                                Some(proto::queries::QueryResult {
+                                    result:
+                                        Some(proto::queries::query_result::Result::Record(record)),
+                                }) => {
+                                    to_visualize.set(record);
+                                    let mut state = state.lock().await;
+                                    state.selected_object = None;
+                                }
+                                _ => {}
+                            };
+                            Ok(())
+                        }
+                        Err(e) => Err(e),
+                    }
+                }
+                _ => Err(anyhow::anyhow!(
+                    "cannot performing operation, client or connection is undefined"
+                )),
+            }
+            .map_err(|e| anyhow::anyhow!("Error on execute raw query: {e}"))
         }
         Some(QueryResultCmd::ListAllItemsFromObject) => {
             let (connection, object) = {
@@ -400,7 +426,36 @@ async fn run_cmd(
             Ok(())
         }
         Some(QueryResultCmd::OpenAddRecordPopup) => {
-            render_popup.set(Some(Popup::AddRecordToObject(false)));
+            let Some(cli) = objects_client else {
+                return Err(anyhow::anyhow!(
+                    "cannot open a popup: objects client is undefined"
+                ));
+            };
+            let (connection, obj_desc) = {
+                let state = state.lock().await;
+                (
+                    state.selected_connection.clone(),
+                    state.selected_object.clone(),
+                )
+            };
+            let obj = cli
+                .get_object_of_decriptor(proto::objects::GetObjectOfDecriptorRequest {
+                    connection: connection,
+                    descriptor: obj_desc,
+                })
+                .await;
+            match obj {
+                Ok(resp) => {
+                    let mut state = state.lock().await;
+                    selected_object.set(resp.object);
+                    render_popup.set(Some(Popup::AddRecordToObject(true)));
+                    state.focus_widget = crate::ui4::app_state::Widget::AnyPopup;
+                }
+                Err(e) => {
+                    log::error!(target: "query_result", "Error on get object of descriptor: {e}");
+                }
+            }
+
             Ok(())
         }
         Some(QueryResultCmd::ClosePopup) => {

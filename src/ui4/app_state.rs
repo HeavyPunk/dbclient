@@ -46,7 +46,7 @@ impl Default for Page {
 
 #[derive(Clone, PartialEq)]
 pub enum QueryResultCmd {
-    ExecuteRawQuery,
+    ExecuteRawQuery(String),
     ListAllItemsFromObject,
     AddRecordToObject(proto::common::DbRecord),
     RemoveRecordFromObject(proto::common::DbRecord),
@@ -58,7 +58,7 @@ pub enum QueryResultCmd {
 impl fmt::Display for QueryResultCmd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            QueryResultCmd::ExecuteRawQuery => write!(f, "ExecuteRawQuery"),
+            QueryResultCmd::ExecuteRawQuery(_) => write!(f, "ExecuteRawQuery"),
             QueryResultCmd::ListAllItemsFromObject => write!(f, "ListAllItemsFromObject"),
             QueryResultCmd::AddRecordToObject(_) => write!(f, "AddRecordToObject"),
             QueryResultCmd::RemoveRecordFromObject(_) => write!(f, "RemoveRecordFromObject"),
