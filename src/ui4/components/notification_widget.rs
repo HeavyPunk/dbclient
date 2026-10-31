@@ -2,11 +2,10 @@ use std::time::{Duration, SystemTime};
 
 use dbclient::virtual_logger::Notification;
 use iocraft::{
-    component,
+    AnyElement, Color, Hooks, Props, component,
     components::{Text, View},
     element,
     hooks::{UseFuture, UseState},
-    AnyElement, Color, Hooks, Props,
 };
 use tokio::sync::mpsc::Receiver;
 

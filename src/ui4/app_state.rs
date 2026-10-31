@@ -3,11 +3,10 @@ use std::{sync::Arc, time::Duration};
 
 use dbclient::virtual_logger::Notification;
 use iocraft::{
-    component,
+    AnyElement, Hooks, Props, component,
     components::View,
     element,
     hooks::{UseFuture, UseState, UseTerminalSize},
-    AnyElement, Hooks, Props,
 };
 use tokio::sync::Mutex;
 

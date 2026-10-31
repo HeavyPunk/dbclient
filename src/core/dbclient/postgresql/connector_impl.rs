@@ -13,8 +13,8 @@ use crate::core::{
     proto::{
         self,
         postgresql::{
-            postgres_field::Field, PostgresObjectDescriptor, PostgresRecord,
-            PostgresTableDescriptor,
+            PostgresObjectDescriptor, PostgresRecord, PostgresTableDescriptor,
+            postgres_field::Field,
         },
         queries::ExecuteRawQueryResponse,
     },
@@ -694,7 +694,7 @@ impl Connector for PostgresConnector {
                         crate::core::dbclient::connector::ConnectorError::InvalidRequest(
                             "only list table available",
                         ),
-                    )
+                    );
                 }
             };
 
@@ -1450,31 +1450,43 @@ mod integration_tests {
             .map(|column| column.name.as_str())
             .collect();
         assert_eq!(column_names, ["id", "name", "age"]);
-        assert!(table
-            .constrains
-            .iter()
-            .any(|constraint| constraint.name == "users_pk"));
-        assert!(table
-            .constrains
-            .iter()
-            .any(|constraint| constraint.name == "users_age_check"));
-        assert!(table
-            .indexes
-            .iter()
-            .any(|index| index.name == "users_name_idx"));
+        assert!(
+            table
+                .constrains
+                .iter()
+                .any(|constraint| constraint.name == "users_pk")
+        );
+        assert!(
+            table
+                .constrains
+                .iter()
+                .any(|constraint| constraint.name == "users_age_check")
+        );
+        assert!(
+            table
+                .indexes
+                .iter()
+                .any(|index| index.name == "users_name_idx")
+        );
 
-        assert!(schema_object
-            .views
-            .iter()
-            .any(|view| view.name == "active_users"));
-        assert!(schema_object
-            .materialized_views
-            .iter()
-            .any(|view| view.name == "users_snapshot"));
-        assert!(schema_object
-            .functions
-            .iter()
-            .any(|function| function.name == "user_count"));
+        assert!(
+            schema_object
+                .views
+                .iter()
+                .any(|view| view.name == "active_users")
+        );
+        assert!(
+            schema_object
+                .materialized_views
+                .iter()
+                .any(|view| view.name == "users_snapshot")
+        );
+        assert!(
+            schema_object
+                .functions
+                .iter()
+                .any(|function| function.name == "user_count")
+        );
 
         client
             .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))

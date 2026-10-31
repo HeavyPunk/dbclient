@@ -1,9 +1,8 @@
 use iocraft::{
-    component,
+    AnyElement, Color, Hooks, JustifyContent, KeyCode, KeyEvent, KeyEventKind, Props, component,
     components::{ScrollView, ScrollViewHandle, Text, TextInput, View},
     element,
     hooks::{State, UseComponentRect, UseRef, UseState, UseTerminalEvents},
-    AnyElement, Color, Hooks, JustifyContent, KeyCode, KeyEvent, KeyEventKind, Props,
 };
 
 use crate::{core::proto, ui4::app_state::QueryResultCmd};
@@ -52,8 +51,8 @@ pub fn AddRecordToObjectForm(
         .map(|index| field_heights_ref.get(index).copied().unwrap_or(1) + 2) // NOTE: +2 is borders
         .sum::<usize>();
     let selected_height = field_heights_ref.get(selected_index).copied().unwrap_or(1) + 2; // NOTE:
-                                                                                           // +2 is
-                                                                                           // borders
+    // +2 is
+    // borders
     let viewport_height = scroll_handle.read().viewport_height().max(0) as usize;
     let current_offset = scroll_handle.read().scroll_offset().max(0) as usize;
     if viewport_height > 0 {

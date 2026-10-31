@@ -1,11 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use iocraft::{
-    component,
+    AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent, component,
     components::{BorderStyle, View},
     element,
     hooks::{UseFuture, UseState, UseTerminalEvents},
-    AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent,
 };
 use tokio::sync::Mutex;
 

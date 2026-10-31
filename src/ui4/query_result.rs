@@ -1,22 +1,22 @@
 use std::{sync::Arc, time::Duration};
 
 use iocraft::{
+    AlignContent, AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Position, Props,
     component,
     components::{BorderStyle, Text, View},
     element,
     hooks::{State, UseFuture, UseState, UseTerminalEvents},
-    AlignContent, AnyElement, Color, Hooks, KeyCode, KeyEvent, KeyEventKind, Position, Props,
 };
 use tokio::sync::Mutex;
 
 use crate::{
     core::proto::{
         self,
-        common::{db_field::Field, DbRecord},
+        common::{DbRecord, db_field::Field},
     },
     ui4::{
         app_state::{AppState, Page, QueryResultCmd},
-        components::table_view::{table_event_handler, TableView},
+        components::table_view::{TableView, table_event_handler},
         forms::{
             add_record_to_object::AddRecordToObjectForm, custom_query::CustomQuery,
             update_record_of_object::UpdateRecordOfObject,
