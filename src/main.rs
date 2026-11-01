@@ -6,7 +6,7 @@ use cli::Cli;
 use config::Config;
 use dbclient::virtual_logger::{Notification, VirtualLogger};
 use flexi_logger::{FileSpec, Logger, WriteMode};
-use iocraft::{element, ElementExt};
+use iocraft::{ElementExt, element};
 use tokio::sync::Mutex;
 
 use crate::ui4::app_state::{AppState, Page, QueryResultCmd};

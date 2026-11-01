@@ -6,15 +6,17 @@ use tokio_postgres::{NoTls, Row};
 
 use crate::core::{
     dbclient::connector::{
-        AddRecordToObjectRequest, Connector, GetObjectsResult, ListAllItemsFromObjectRequest,
-        ListAllItemsFromObjectResult, RemoveRecordFromObjectRequest, UpdateRecordOfObjectRequest,
+        AddRecordToObjectRequest, Connector, ExecuteRawQueryRequest, ExecuteRawQueryResult,
+        GetObjectsResult, ListAllItemsFromObjectRequest, ListAllItemsFromObjectResult,
+        RemoveRecordFromObjectRequest, UpdateRecordOfObjectRequest,
     },
     proto::{
         self,
         postgresql::{
-            postgres_field::Field, PostgresObjectDescriptor, PostgresRecord,
-            PostgresTableDescriptor,
+            PostgresObjectDescriptor, PostgresRecord, PostgresTableDescriptor,
+            postgres_field::Field,
         },
+        queries::ExecuteRawQueryResponse,
     },
 };
 
@@ -310,7 +312,7 @@ impl Connector for PostgresConnector {
         let (client, connection) = tokio_postgres::connect(&self.config.uri, NoTls).await?;
         tokio::spawn(async move {
             if let Err(error) = connection.await {
-                eprintln!("PostgreSQL connection error: {error}");
+                log::warn!("PostgreSQL connection error: {error}");
             }
         });
 
@@ -692,7 +694,7 @@ impl Connector for PostgresConnector {
                         crate::core::dbclient::connector::ConnectorError::InvalidRequest(
                             "only list table available",
                         ),
-                    )
+                    );
                 }
             };
 
@@ -1021,6 +1023,72 @@ impl Connector for PostgresConnector {
                 ),
             ),
         }
+    }
+
+    async fn execute_raw_query(
+        &mut self,
+        req: ExecuteRawQueryRequest,
+    ) -> Result<ExecuteRawQueryResult, crate::core::dbclient::connector::ConnectorError> {
+        let (client, connection) = tokio_postgres::connect(&self.config.uri, NoTls).await?;
+        tokio::spawn(async move {
+            if let Err(error) = connection.await {
+                eprintln!("PostgreSQL connection error: {error}");
+            }
+        });
+
+        let rows = client.query(&req.query, &[]).await?;
+        let mut result_columns = Vec::<(String, proto::postgresql::PostgresField)>::new();
+
+        if let Some(row) = rows.get(0) {
+            for column in row.columns() {
+                let column_type_name = column.type_().name();
+                let pg_type =
+                    proto::postgresql::PostgresField::from_pg_type(column_type_name, None, None);
+                let column_name = column.name();
+                result_columns.push((column_name.to_string(), pg_type));
+            }
+        }
+
+        let mut proto_rows = vec![];
+        for row in rows {
+            let mut proto_row = proto::postgresql::PostgresRecordTableRow { values: vec![] };
+            let columns = row.columns();
+            for column in columns {
+                let name = column.name();
+                let column_type_name = column.type_().name();
+                let value = proto::postgresql::PostgresField::from_pg_type(
+                    column_type_name,
+                    Some(&row),
+                    Some(name),
+                );
+                proto_row.values.push(value.clone());
+            }
+            proto_rows.push(proto_row);
+        }
+        Ok(ExecuteRawQueryResponse {
+            result: Some(proto::queries::QueryResult {
+                result: Some(proto::queries::query_result::Result::Record(
+                    proto::common::DbRecord {
+                        specification: Some(proto::common::db_record::Specification::Postgres(
+                            proto::postgresql::PostgresRecord {
+                                record: Some(proto::postgresql::postgres_record::Record::Table(
+                                    proto::postgresql::PostgresRecordTable {
+                                        columns: result_columns
+                                            .iter()
+                                            .map(|c| proto::postgresql::PostgresTableColumn {
+                                                name: c.0.clone(),
+                                                field: Some(c.1.clone()),
+                                            })
+                                            .collect(),
+                                        rows: proto_rows,
+                                    },
+                                )),
+                            },
+                        )),
+                    },
+                )),
+            }),
+        })
     }
 }
 
@@ -1382,31 +1450,43 @@ mod integration_tests {
             .map(|column| column.name.as_str())
             .collect();
         assert_eq!(column_names, ["id", "name", "age"]);
-        assert!(table
-            .constrains
-            .iter()
-            .any(|constraint| constraint.name == "users_pk"));
-        assert!(table
-            .constrains
-            .iter()
-            .any(|constraint| constraint.name == "users_age_check"));
-        assert!(table
-            .indexes
-            .iter()
-            .any(|index| index.name == "users_name_idx"));
+        assert!(
+            table
+                .constrains
+                .iter()
+                .any(|constraint| constraint.name == "users_pk")
+        );
+        assert!(
+            table
+                .constrains
+                .iter()
+                .any(|constraint| constraint.name == "users_age_check")
+        );
+        assert!(
+            table
+                .indexes
+                .iter()
+                .any(|index| index.name == "users_name_idx")
+        );
 
-        assert!(schema_object
-            .views
-            .iter()
-            .any(|view| view.name == "active_users"));
-        assert!(schema_object
-            .materialized_views
-            .iter()
-            .any(|view| view.name == "users_snapshot"));
-        assert!(schema_object
-            .functions
-            .iter()
-            .any(|function| function.name == "user_count"));
+        assert!(
+            schema_object
+                .views
+                .iter()
+                .any(|view| view.name == "active_users")
+        );
+        assert!(
+            schema_object
+                .materialized_views
+                .iter()
+                .any(|view| view.name == "users_snapshot")
+        );
+        assert!(
+            schema_object
+                .functions
+                .iter()
+                .any(|function| function.name == "user_count")
+        );
 
         client
             .batch_execute(&format!("DROP SCHEMA {schema} CASCADE"))

@@ -4,11 +4,11 @@ use std::{
 };
 
 use iocraft::{
+    AnyElement, Color, FlexDirection, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent,
     component,
     components::{ScrollView, ScrollViewHandle, Text, View},
     element,
     hooks::{UseRef, UseState, UseTerminalEvents},
-    AnyElement, Color, FlexDirection, Hooks, KeyCode, KeyEvent, KeyEventKind, Props, TerminalEvent,
 };
 use tokio::sync::Mutex as TokioMutex;
 

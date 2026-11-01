@@ -122,11 +122,11 @@ enum GraphNode<
 }
 
 impl<
-        TKey: PartialEq + Copy,
-        CallbackState,
-        CallbackResult,
-        Callback: GraphCallback<CallbackState, CallbackResult>,
-    > Graph<TKey, CallbackState, CallbackResult, Callback>
+    TKey: PartialEq + Copy,
+    CallbackState,
+    CallbackResult,
+    Callback: GraphCallback<CallbackState, CallbackResult>,
+> Graph<TKey, CallbackState, CallbackResult, Callback>
 {
     pub fn new() -> Self {
         Self {
@@ -288,7 +288,7 @@ mod tests {
     mod graph {
         use std::marker::PhantomData;
 
-        use super::{noop, TestCallback};
+        use super::{TestCallback, noop};
         use crate::hotkey_manager::{Graph, GraphNode, HotKeyError};
 
         fn assert_graph(

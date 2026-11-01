@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt};
 
 use crate::config::Connection;
 use crate::core::dbclient::connector::{
-    self, Connector, ConnectorError, ListAllItemsFromObjectResult,
+    self, Connector, ConnectorError, ExecuteRawQueryResult, ListAllItemsFromObjectResult,
 };
 use crate::core::dbclient::postgresql::connector_impl::PostgresConnector;
 use crate::core::proto::common::{DbObjectDescriptor, DbRecord};
@@ -261,6 +261,17 @@ impl QueriesServer {
         Ok(items)
     }
 
+    async fn _execute_raw_query(
+        conn: &Connection,
+        query: String,
+    ) -> Result<ExecuteRawQueryResult, ConnectorError> {
+        let mut connector = Self::resolve_connector(conn);
+        let query_result = connector
+            .execute_raw_query(connector::ExecuteRawQueryRequest { query: query })
+            .await?;
+        Ok(query_result)
+    }
+
     async fn _add_record_to_object(
         conn: &Connection,
         desc: DbObjectDescriptor,
@@ -310,9 +321,20 @@ impl QueriesServer {
 impl super::proto::queries::QueriesService for QueriesServer {
     async fn execute_raw_query(
         &self,
-        _request: ExecuteRawQueryRequest,
+        request: ExecuteRawQueryRequest,
     ) -> ::anyhow::Result<ExecuteRawQueryResponse> {
-        todo!()
+        let Some(conn) = request.connection else {
+            return Err(QueriesServerErrors::ValidationError(
+                "connection is not defined in request",
+            ))?;
+        };
+        let Some(conn) = self.conns.get(&conn.id) else {
+            return Err(QueriesServerErrors::ConnectionNotFound)?;
+        };
+        match Self::_execute_raw_query(conn, request.query.clone()).await {
+            Ok(resp) => Ok(resp),
+            Err(e) => Err(QueriesServerErrors::ConnectorError(e))?,
+        }
     }
     async fn list_all_items_from_object(
         &self,

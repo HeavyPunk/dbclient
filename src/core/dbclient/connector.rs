@@ -22,6 +22,7 @@ pub type GetObjectRequest = proto::common::DbObjectDescriptor;
 pub type GetObjectResult = proto::common::DbObject;
 pub type ListAllItemsFromObjectRequest = proto::common::DbObjectDescriptor;
 pub type ListAllItemsFromObjectResult = proto::common::DbRecord;
+pub type ExecuteRawQueryResult = proto::queries::ExecuteRawQueryResponse;
 
 pub struct AddRecordToObjectRequest {
     pub descriptor: proto::common::DbObjectDescriptor,
@@ -37,6 +38,10 @@ pub struct UpdateRecordOfObjectRequest {
     pub descriptor: proto::common::DbObjectDescriptor,
     pub old_object: proto::common::DbRecord,
     pub new_object: proto::common::DbRecord,
+}
+
+pub struct ExecuteRawQueryRequest {
+    pub query: String,
 }
 
 #[async_trait::async_trait]
@@ -65,4 +70,9 @@ pub trait Connector: Send {
         &mut self,
         req: UpdateRecordOfObjectRequest,
     ) -> Result<(), ConnectorError>;
+
+    async fn execute_raw_query(
+        &mut self,
+        req: ExecuteRawQueryRequest,
+    ) -> Result<ExecuteRawQueryResult, ConnectorError>;
 }
